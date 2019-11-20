@@ -96,9 +96,9 @@ def shp_series(var, shp_path, path, files):
     return values
 
 
-def to_geotiff(nc_path, var, **kwargs):
+def convert_to_geotiff(nc_path, var, **kwargs):
     """
-    Turns a netcdf or directory of netcdfs into a geotiff
+    Turns netcdfs into geotiffs
 
     :param nc_path: path to a netcdf for a directory containing netcdf files
     :param var: the short-code name of the variable within the netcdf
@@ -120,6 +120,7 @@ def to_geotiff(nc_path, var, **kwargs):
 
     # parse the optional argument from the kwargs
     save_dir = kwargs.get('save_dir', nc_path)
+    delete_sources = kwargs.get('delete_sources', False)
 
     # open the first netcdf and collect georeferencing information
     nc_obj = netCDF4.Dataset(os.path.join(nc_path, files[0]), 'r')
@@ -154,6 +155,10 @@ def to_geotiff(nc_path, var, **kwargs):
         data = data[0]
         data = numpy.flip(data, axis=0)
         nc_obj.close()
+
+        # if you want to delete the source netcdfs as you go
+        if delete_sources:
+            os.remove(path)
 
         # write it to a geotiff
         with rasterio.open(

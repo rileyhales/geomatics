@@ -1,6 +1,6 @@
 package:
-  name: halesgis
-  version: 0.0.1
+  name: geomatics
+  version: 0.1
 
 about:
   author: Riley Hales
@@ -11,7 +11,7 @@ about:
   dev_url: https://github.com/rileyhales/geomatics
 
 build:
-  string: dev
+  string: b0
   noarch: python
   preserve_egg_dir: True
 
@@ -30,7 +30,7 @@ requirements:
     - requests
 
 outputs:
-  - name: halesgis
+  - name: geomatics
 
 test:
   imports:
