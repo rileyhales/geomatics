@@ -1,5 +1,6 @@
 .idea
 _build
+/docs/_build/
 build
 .DS_Store
 .ipynb_checkpoints
