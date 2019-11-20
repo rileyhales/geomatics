@@ -1,0 +1,47 @@
+package:
+  name: hales-gis
+  version: 0.0.1
+
+about:
+  author: Riley Hales
+  description: GIS tools developed by Riley Hales for the BYU Hydroinformatics Lab
+  license: BSD 3-Clause License
+  license_family: BSD
+  doc_url: https://geomatics.readthedocs.io
+  dev_url: https://github.com/rileyhales/geomatics
+
+build:
+  string: dev
+  noarch: python
+  preserve_egg_dir: True
+
+source:
+  path: ..
+
+requirements:
+  build:
+    - python
+  run:
+    - python>=3
+    - rasterio
+    - rasterstats
+    - xarray
+    - netcdf4
+    - requests
+
+outputs:
+  - name: hales-gis
+
+test:
+  imports:
+    - rasterio
+    - rasterstats
+    - xarray
+    - netcdf4
+    - requests
+
+extra:
+  copy_test_source_files: true
+  final: true
+  recipe-maintainers:
+    - rileyhales
