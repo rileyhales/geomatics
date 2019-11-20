@@ -1,5 +1,5 @@
 package:
-  name: hales-gis
+  name: halesgis
   version: 0.0.1
 
 about:
@@ -30,7 +30,7 @@ requirements:
     - requests
 
 outputs:
-  - name: hales-gis
+  - name: halesgis
 
 test:
   imports:
