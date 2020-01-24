@@ -6,7 +6,7 @@ with open("README.md", "r") as readme:
 setup(
     name='geomatics',
     packages=['geomatics'],
-    version='0.1b0',
+    version='0.2',
     description='GIS tools developed by Riley Hales for the BYU Hydroinformatics Lab',
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -15,8 +15,6 @@ setup(
                       Source='https://github.com/rileyhales/geomatics'),
     license='BSD 3-Clause',
     license_family='BSD',
-    package_data={'': ['*.ipynb', '*.html']},
-    include_package_data=True,
     python_requires='>=3',
-    install_requires=['rasterio', 'rasterstats', 'xarray', 'netcdf4', 'requests', 'shapefile']
+    install_requires=['rasterio', 'rasterstats', 'xarray', 'netcdf4']
 )

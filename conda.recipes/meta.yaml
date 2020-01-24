@@ -13,7 +13,6 @@ about:
 build:
   string: b0
   noarch: python
-  preserve_egg_dir: True
 
 source:
   path: ..
@@ -38,7 +37,6 @@ test:
     - rasterstats
     - xarray
     - netcdf4
-    - requests
 
 extra:
   copy_test_source_files: true
