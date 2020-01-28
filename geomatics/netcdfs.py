@@ -1,15 +1,16 @@
 import datetime
-import dateutil
 import os
+
+import dateutil
 import netCDF4
-import numpy
+import numpy as np
+import pandas as pd
 import rasterio
 import rasterstats
-import pandas
 
-#todo
-# allow the user to specify min, mean, max, mode for the box series
-# handle dimensions in different orders when slicing the array
+# todo allow the user to specify min, mean, max, mode for the box series
+# todo handle dimensions in different orders than time/lat/lon when slicing the array (detect it automatically)
+# todo get the time based on something besides file names
 
 
 def point_series(paths, variable, coordinates, filename_pattern, **kwargs):
@@ -21,31 +22,19 @@ def point_series(paths, variable, coordinates, filename_pattern, **kwargs):
     paths = __get_list_of_files(paths)
     paths.sort()
 
-    # get a list of the x&y coordinates using the first file as a reference
+    # get a list of the x&y coordinates in the netcdfs using the first file as a reference
     nc_obj = netCDF4.Dataset(paths[0], 'r')
     nc_xs = nc_obj[x_var][:]
     nc_ys = nc_obj[y_var][:]
-    # get the index number of the x&y coordinate provided for the point
-    x_index = (numpy.abs(nc_xs - round(float(coordinates[0]), 2))).argmin()
-    y_index = (numpy.abs(nc_ys - round(float(coordinates[1]), 2))).argmin()
+    # determine the index in the netcdf's coordinates for the xy coordinate provided
+    x_index = (np.abs(nc_xs - round(float(coordinates[0]), 2))).argmin()
+    y_index = (np.abs(nc_ys - round(float(coordinates[1]), 2))).argmin()
     nc_obj.close()
 
     # make the return item
     timeseries = []
 
-    # if it is a single file, extract the values at each entry of the time variable's list
-    # if len(paths) == 0:
-        # nc_obj = netCDF4.Dataset(paths[0], 'r')
-        # if not time_increment:
-        #     time_increment = __guess_timedelta(nc_obj)
-        # for t_step in nc_obj['time'][:]:
-        #     # the time of this data is the start date plus the timedelta time the number of steps away it is.
-        #     time = startdatetime + (time_increment * float(nc_obj['time'][t_step].data))
-        #     # slice the array at the area you want, depends on the order of the dimensions
-        #     timeseries.append((time, nc_obj[variable][t_step, y_index, x_index].data))
-        # nc_obj.close()
-
-    # if there were many files, iterate over each file
+    # iterate over each file, extracting the
     for path in paths:
         # open the file
         nc_obj = netCDF4.Dataset(path, 'r')
@@ -57,21 +46,15 @@ def point_series(paths, variable, coordinates, filename_pattern, **kwargs):
         timeseries.append((time, val))
         nc_obj.close()
 
-    # sort the list by the 0 entry (the date), turn it into a pandas dataframe, return it
+    # sort the list by the 0 entry (the date), turn it into a pd dataframe, return it
     timeseries.sort(key=lambda tup: tup[0])
-    return pandas.DataFrame(timeseries, columns=['datetime', 'values'])
+    return pd.DataFrame(timeseries, columns=['datetime', 'values'])
 
 
-def box_series(paths, variable, coordinates, startdatetime, **kwargs):
+def box_series(paths, variable, coordinates, filename_pattern, **kwargs):
     # for customizing the workflow for standards non-compliant netcdf files
     x_var = kwargs.get('xvar', 'lon')
     y_var = kwargs.get('yvar', 'lat')
-    # now figure out what variables we were given to try to determine the timesteps
-    filename_timestring = kwargs.get('filename_timestring', None)
-    time_metadata_var = kwargs.get('time_metadata_var', 'time')
-    time_attr = kwargs.get('time_attr', None)
-    timestring_format = kwargs.get('timestring_format', None)
-    time_increment = kwargs.get('time_increment', None)
 
     # confirm that a valid path to data was provided
     paths = __get_list_of_files(paths)
@@ -81,10 +64,10 @@ def box_series(paths, variable, coordinates, startdatetime, **kwargs):
     nc_xs = nc_obj[x_var][:]
     nc_ys = nc_obj[y_var][:]
     # get the indices of the bounding box corners
-    xmin_index = (numpy.abs(nc_xs - round(float(coordinates[0]), 2))).argmin()
-    ymin_index = (numpy.abs(nc_ys - round(float(coordinates[1]), 2))).argmin()
-    xmax_index = (numpy.abs(nc_xs - round(float(coordinates[2]), 2))).argmin()
-    ymax_index = (numpy.abs(nc_ys - round(float(coordinates[3]), 2))).argmin()
+    xmin_index = (np.abs(nc_xs - round(float(coordinates[0]), 2))).argmin()
+    ymin_index = (np.abs(nc_ys - round(float(coordinates[1]), 2))).argmin()
+    xmax_index = (np.abs(nc_xs - round(float(coordinates[2]), 2))).argmin()
+    ymax_index = (np.abs(nc_ys - round(float(coordinates[3]), 2))).argmin()
     nc_obj.close()
 
     # make the return item
@@ -94,51 +77,34 @@ def box_series(paths, variable, coordinates, startdatetime, **kwargs):
     for t_step, path in enumerate(paths):
         # open the file
         nc_obj = netCDF4.Dataset(path, 'r')
-
-        # attempt to determine the correct datetime to use in the timeseries
-        try:
-            if filename_timestring:
-                time = os.path.basename(path)
-                time = datetime.datetime.strptime(time, filename_timestring)
-            # elif time_attr and timestring_format:
-            #     time = datetime.datetime.strptime(nc_obj['time'].__dict__[time_attr], timestring_format)
-            # elif time_increment:
-            #     time = startdatetime + (time_increment * float(nc_obj['time'][t_step].data))
-        except Exception:
-            raise Exception('Unable to parse the time from the ')
-
+        # determine the correct datetime to use in the timeseries
+        time = os.path.basename(path)
+        time = datetime.datetime.strptime(time, filename_pattern)
         # slice the array, drop nan values, get the mean, append to list of values
         array = nc_obj[variable][0, ymin_index:ymax_index, xmin_index:xmax_index].data
-        array[array < -5000] = numpy.nan  # If you have fill values, change the comparator to git rid of it
+        array[array < -5000] = np.nan  # If you have fill values, change the comparator to git rid of it
         array = array.flatten()
-        array = array[~numpy.isnan(array)]
-        print(array)
+        array = array[~np.isnan(array)]
         timeseries.append((time, float(array.mean())))
         nc_obj.close()
 
-    # sort the list by the 0 entry (the date), turn it into a pandas dataframe, return it
+    # sort the list by the 0 entry (the date), turn it into a pd dataframe, return it
     timeseries.sort(key=lambda tup: tup[0])
-    return pandas.DataFrame(timeseries, columns=['datetime', 'values'])
+    return pd.DataFrame(timeseries, columns=['datetime', 'values'])
 
 
-def shp_series(paths, variable, shp_path, startdatetime, **kwargs):
+def shp_series(paths, variable, shp_path, filename_pattern, **kwargs):
     # for customizing the workflow for standards non-compliant netcdf files
     x_var = kwargs.get('xvar', 'lon')
     y_var = kwargs.get('yvar', 'lat')
-    # now figure out what variables we were given to try to determine the timesteps
-    filename_timestring = kwargs.get('filename_timestring', None)
-    time_metadata_var = kwargs.get('time_metadata_var', 'time')
-    time_attr = kwargs.get('time_attr', None)
-    timestring_format = kwargs.get('timestring_format', None)
-    time_increment = kwargs.get('time_increment', None)
 
     # confirm that a valid path to data was provided
     paths = __get_list_of_files(paths)
 
-    # open the netcdf and get metadata
+    # open the netcdf determine the affine transformation of the netcdf grids
     nc_obj = netCDF4.Dataset(paths[0], 'r')
-    nc_xs = nc_obj.variables['lon'][:]
-    nc_ys = nc_obj.variables['lat'][:]
+    nc_xs = nc_obj.variables[x_var][:]
+    nc_ys = nc_obj.variables[y_var][:]
     affine = rasterio.transform.from_origin(nc_xs.min(), nc_ys.max(), nc_ys[1] - nc_ys[0], nc_xs[1] - nc_xs[0])
     nc_obj.close()
 
@@ -149,32 +115,23 @@ def shp_series(paths, variable, shp_path, startdatetime, **kwargs):
     for t_step, path in enumerate(paths):
         # open the file
         nc_obj = netCDF4.Dataset(path, 'r')
-
-        # attempt to determine the correct datetime to use in the timeseries
-        try:
-            if filename_timestring:
-                time = os.path.basename(path)
-                time = datetime.datetime.strptime(time, filename_timestring)
-            # elif time_attr and timestring_format:
-            #     time = datetime.datetime.strptime(nc_obj['time'].__dict__[time_attr], timestring_format)
-            # elif time_increment:
-            #     time = startdatetime + (time_increment * float(nc_obj['time'][t_step].data))
-        except Exception:
-            raise Exception('Unable to parse the time from the ')
+        # determine the correct datetime to use in the timeseries
+        time = os.path.basename(path)
+        time = datetime.datetime.strptime(time, filename_pattern)
 
         array = nc_obj.variables[variable][:]  # this is the array of values for the nc_obj
-        array = numpy.asarray(array)[0, :, :]  # converting the array from 3D to 2D
-        array[array < -9000] = numpy.nan  # use the comparator to drop nodata fills
+        array = np.asarray(array)[0, :, :]  # converting the array from 3D to 2D
+        array[array < -9000] = np.nan  # use the comparator to drop nodata fills
         array = array[::-1]  # vertically flip array so tiff orientation is right (you just have to, try it)
-        stats = rasterstats.zonal_stats(shp_path, array, affine=affine, nodata=numpy.nan, stats="mean")
+        stats = rasterstats.zonal_stats(shp_path, array, affine=affine, nodata=np.nan, stats="mean")
         tmp = [i['mean'] for i in stats if i['mean'] is not None]
         timeseries.append((time, sum(tmp) / len(tmp)))
 
         nc_obj.close()
 
-    # sort the list by the 0 entry (the date), turn it into a pandas dataframe, return it
+    # sort the list by the 0 entry (the date), turn it into a pd dataframe, return it
     timeseries.sort(key=lambda tup: tup[0])
-    return pandas.DataFrame(timeseries, columns=['datetime', 'values'])
+    return pd.DataFrame(timeseries, columns=['datetime', 'values'])
 
 
 def convert_to_geotiff(nc_path, var, **kwargs):
@@ -232,9 +189,9 @@ def convert_to_geotiff(nc_path, var, **kwargs):
 
         # open the netcdf and get the data array
         nc_obj = netCDF4.Dataset(path, 'r')
-        data = numpy.asarray(nc_obj[var][:])
+        data = np.asarray(nc_obj[var][:])
         data = data[0]
-        data = numpy.flip(data, axis=0)
+        data = np.flip(data, axis=0)
         nc_obj.close()
 
         # if you want to delete the source netcdfs as you go
@@ -250,7 +207,7 @@ def convert_to_geotiff(nc_path, var, **kwargs):
                 width=data.shape[1],
                 count=1,
                 dtype=data.dtype,
-                nodata=numpy.nan,
+                nodata=np.nan,
                 crs='+proj=latlong',
                 transform=gt,
         ) as dst:
@@ -278,27 +235,25 @@ def __get_list_of_files(path):
         raise ValueError('Provide an absolute file path to a netcdf or directory of netcdf files, or a list of paths')
 
 
-def __guess_timedelta(nc_dataset):
-    units = str(nc_dataset['time'].__dict__['units'])
+def __guess_timedelta(nc_dataset, **kwargs):
+    t_var = kwargs.get('tvar', 'time')
+    step = kwargs.get('step', 1)
+
+    units = str(nc_dataset[t_var].__dict__['units'])
     units = units.replace(' ', '').lower()
     if units.startswith('years'):
-        return dateutil.relativedelta.relativedelta(years=1)
+        return dateutil.relativedelta.relativedelta(years=step)
     elif units.startswith('months'):
-        return dateutil.relativedelta.relativedelta(months=1)
+        return dateutil.relativedelta.relativedelta(months=step)
     elif units.startswith('weeks'):
-        return datetime.timedelta(weeks=1)
+        return datetime.timedelta(weeks=step)
     elif units.startswith('days'):
-        return datetime.timedelta(days=1)
+        return datetime.timedelta(days=step)
     elif units.startswith('hours'):
-        return datetime.timedelta(hours=1)
+        return datetime.timedelta(hours=step)
     elif units.startswith('minutes'):
-        return datetime.timedelta(minutes=1)
+        return datetime.timedelta(minutes=step)
     elif units.startswith('seconds'):
-        return datetime.timedelta(seconds=1)
+        return datetime.timedelta(seconds=step)
     else:
         raise ValueError("Timedelta was not specified and could not be guessed from the time variable's metadata")
-
-
-ts = box_series('/Users/rileyhales/thredds/gldas/raw', 'Tair_f_inst', [10, 10, 20, 20],
-                datetime.date(year=2010, month=1, day=1), filename_timestring='GLDAS_NOAH025_M.A%Y%m.021.nc4')
-print(ts)

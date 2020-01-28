@@ -27,6 +27,7 @@ requirements:
     - xarray
     - netcdf4
     - requests
+    - python-dateutil
 
 outputs:
   - name: geomatics
@@ -37,6 +38,7 @@ test:
     - rasterstats
     - xarray
     - netcdf4
+    - dateutil
 
 extra:
   copy_test_source_files: true

@@ -16,5 +16,5 @@ setup(
     license='BSD 3-Clause',
     license_family='BSD',
     python_requires='>=3',
-    install_requires=['rasterio', 'rasterstats', 'xarray', 'netcdf4']
+    install_requires=['rasterio', 'rasterstats', 'xarray', 'netcdf4', 'python-dateutil']
 )
