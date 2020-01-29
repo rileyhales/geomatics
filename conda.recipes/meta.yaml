@@ -28,6 +28,8 @@ requirements:
     - netcdf4
     - requests
     - python-dateutil
+    - numpy
+    - pandas
 
 outputs:
   - name: geomatics
