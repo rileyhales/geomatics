@@ -9,18 +9,19 @@ import rasterio
 import rasterstats
 
 
-def point_series(paths, variable, coordinates, filename_pattern, **kwargs):
+def point_series(path, variable, coordinates, filename_pattern=None, **kwargs):
     # for customizing the workflow for standards non-compliant netcdf files
     x_var = kwargs.get('xvar', 'lon')
     y_var = kwargs.get('yvar', 'lat')
     t_var = kwargs.get('tvar', 'time')
+    fill_value = kwargs.get('fill_value', -9999)
 
     # confirm that a valid path to data was provided
-    paths = __path_to_file_list(paths)
-    paths.sort()
+    files = __path_to_file_list(path)
+    files.sort()
 
     # get a list of the x&y coordinates in the netcdfs using the first file as a reference
-    nc_obj = netCDF4.Dataset(paths[0], 'r')
+    nc_obj = netCDF4.Dataset(files[0], 'r')
     nc_xs = nc_obj[x_var][:]
     nc_ys = nc_obj[y_var][:]
     # determine the index in the netcdf's coordinates for the xy coordinate provided
@@ -32,24 +33,38 @@ def point_series(paths, variable, coordinates, filename_pattern, **kwargs):
     # make the return item
     timeseries = []
 
-    # iterate over each file, extracting the
-    for path in paths:
-        # open the file
-        nc_obj = netCDF4.Dataset(path, 'r')
-        # attempt to determine the correct datetime to use in the timeseries
-        time = os.path.basename(path)
-        time = datetime.datetime.strptime(time, filename_pattern)
-        # slice the array at the area you want, depends on the order of the dimensions
-        val = float(__slice_point(nc_obj[variable], dim_order, x_index, y_index))
-        timeseries.append((time, val))
+    # if there is only one file, check for many time values
+    if len(files) == 1:
+        # open the files
+        nc_obj = netCDF4.Dataset(files[0], 'r')
+        # slice the time array to get a list of the time values
+        times = list(nc_obj[t_var][:].data)
+        # slice the variable of interest's array across all times
+        values_array = __slice_point(nc_obj[variable], dim_order, x_index, y_index, True)
+        # replace fill values with nan
+        values_array[values_array == fill_value] = np.nan
+        # turn the times and values into a zipped series
+        timeseries = list(zip(times, values_array))
         nc_obj.close()
+
+    # if there were many files, iterate over each file extracting the value and time for each
+    else:
+        for file in files:
+            # open the file
+            nc_obj = netCDF4.Dataset(file, 'r')
+            # attempt to determine the correct datetime to use in the timeseries
+            time = datetime.datetime.strptime(os.path.basename(file), filename_pattern)
+            # slice the array at the area you want, depends on the order of the dimensions
+            val = float(__slice_point(nc_obj[variable], dim_order, x_index, y_index, False))
+            timeseries.append((time, val))
+            nc_obj.close()
 
     # sort the list by the 0 entry (the date), turn it into a pd dataframe, return it
     timeseries.sort(key=lambda tup: tup[0])
     return pd.DataFrame(timeseries, columns=['datetime', 'values'])
 
 
-def box_series(paths, variable, coordinates, filename_pattern, **kwargs):
+def box_series(path, variable, coordinates, filename_pattern=None, **kwargs):
     # for customizing the workflow for standards non-compliant netcdf files
     x_var = kwargs.get('xvar', 'lon')
     y_var = kwargs.get('yvar', 'lat')
@@ -58,10 +73,11 @@ def box_series(paths, variable, coordinates, filename_pattern, **kwargs):
     stat = kwargs.get('stat_type', 'mean')
 
     # confirm that a valid path to data was provided
-    paths = __path_to_file_list(paths)
+    files = __path_to_file_list(path)
+    files.sort()
 
     # get a list of the x&y coordinates using the first file as a reference
-    nc_obj = netCDF4.Dataset(paths[0], 'r')
+    nc_obj = netCDF4.Dataset(files[0], 'r')
     nc_xs = nc_obj[x_var][:]
     nc_ys = nc_obj[y_var][:]
     # get the indices of the bounding box corners
@@ -75,28 +91,55 @@ def box_series(paths, variable, coordinates, filename_pattern, **kwargs):
     # make the return item
     timeseries = []
 
-    # extract values at each timestep
-    for path in paths:
-        # open the file
-        nc_obj = netCDF4.Dataset(path, 'r')
-        # determine the correct datetime to use in the timeseries
-        time = os.path.basename(path)
-        time = datetime.datetime.strptime(time, filename_pattern)
-        # slice the array, drop nan values
-        array = __slice_box(nc_obj[variable], dim_order, xmin_index, ymin_index, xmax_index, ymax_index)
-        array[array == fill_value] = np.nan  # If you have fill values, change the comparator to git rid of it
-        array = array.flatten()
-        array = array[~np.isnan(array)]
+    # if there is only one file, check for many time values
+    if len(files) == 1:
+        # open the files
+        nc_obj = netCDF4.Dataset(files[0], 'r')
+        # slice the time array to get a list of the time values
+        times = list(nc_obj[t_var][:].data)
+        # as we go through the sliced values we need to store the calculated values
+        values = []
+        # slice the variable's array, returns array with shape corresponding to dimension order and size
+        values_array = __slice_box(nc_obj[variable], dim_order, xmin_index, ymin_index, xmax_index, ymax_index, True)
+        # roll axis brings the time dimension to the front so we can iterate over it
+        for values_2d in np.rollaxis(values_array, dim_order.index('t')):
+            values_2d[values_2d == fill_value] = np.nan
+            # get the specific value and append to the timeseries
+            if stat == 'mean':
+                values.append(float(values_2d.mean()))
+            elif stat == 'max':
+                values.append(float(max(values_2d)))
+            elif stat == 'min':
+                values.append(float(min(values_2d)))
+            else:
+                raise ValueError('Unrecognized statistic, {}. Choose stat_type= mean, min or max'.format(stat))
+        # turn the times and values into a zipped series
+        timeseries = list(zip(times, values))
+        nc_obj.close()
 
-        # get the specific value and append to the timeseries
-        if stat == 'mean':
-            timeseries.append((time, float(array.mean())))
-        elif stat == 'max':
-            timeseries.append((time, float(max(array))))
-        elif stat == 'min':
-            timeseries.append((time, float(min(array))))
-        else:
-            raise ValueError('Unrecognized statistic, {}. Choose stat_type= mean, min or max'.format(stat))
+    # if there were many files, iterate over each file extracting the value and time for each
+    else:
+        for file in files:
+            # open the file
+            nc_obj = netCDF4.Dataset(file, 'r')
+            # determine the correct datetime to use in the timeseries
+            time = datetime.datetime.strptime(os.path.basename(file), filename_pattern)
+            # slice the values_array, drop nan values
+            values_array = __slice_box(nc_obj[variable], dim_order, xmin_index, ymin_index, xmax_index, ymax_index, False)
+            # replace the fill values with numpy nan
+            values_array[values_array == fill_value] = np.nan
+            values_array = values_array.flatten()
+            values_array = values_array[~np.isnan(values_array)]
+
+            # get the specific value and append to the timeseries
+            if stat == 'mean':
+                timeseries.append((time, float(values_array.mean())))
+            elif stat == 'max':
+                timeseries.append((time, float(max(values_array))))
+            elif stat == 'min':
+                timeseries.append((time, float(min(values_array))))
+            else:
+                raise ValueError('Unrecognized statistic, {}. Choose stat_type= mean, min or max'.format(stat))
 
         nc_obj.close()
 
@@ -105,7 +148,7 @@ def box_series(paths, variable, coordinates, filename_pattern, **kwargs):
     return pd.DataFrame(timeseries, columns=['datetime', 'values'])
 
 
-def shp_series(paths, variable, shp_path, filename_pattern, **kwargs):
+def shp_series(path, variable, shp_path, filename_pattern=None, **kwargs):
     # for customizing the workflow for standards non-compliant netcdf files
     x_var = kwargs.get('xvar', 'lon')
     y_var = kwargs.get('yvar', 'lat')
@@ -114,10 +157,11 @@ def shp_series(paths, variable, shp_path, filename_pattern, **kwargs):
     stat = kwargs.get('stat_type', 'mean')
 
     # confirm that a valid path to data was provided
-    paths = __path_to_file_list(paths)
+    files = __path_to_file_list(path)
+    files.sort()
 
     # open the netcdf determine the affine transformation of the netcdf grids
-    nc_obj = netCDF4.Dataset(paths[0], 'r')
+    nc_obj = netCDF4.Dataset(files[0], 'r')
     nc_xs = nc_obj.variables[x_var][:]
     nc_ys = nc_obj.variables[y_var][:]
     affine = rasterio.transform.from_origin(nc_xs.min(), nc_ys.max(), nc_ys[1] - nc_ys[0], nc_xs[1] - nc_xs[0])
@@ -127,52 +171,70 @@ def shp_series(paths, variable, shp_path, filename_pattern, **kwargs):
     # make the return item
     timeseries = []
 
-    # extract values at each timestep
-    for path in paths:
-        # open the file
-        nc_obj = netCDF4.Dataset(path, 'r')
-        # determine the correct datetime to use in the timeseries
-        time = os.path.basename(path)
-        time = datetime.datetime.strptime(time, filename_pattern)
-
-        # this is the array of values for the nc_obj
-        array = np.asarray(nc_obj.variables[variable][:])
-        # if time was one of the dimensions, we need to remove it
-        if 't' in dim_order:
-            array = __slice_shape(array, dim_order)  # converting the array from 3D to 2D (removing the
-        # drop fill and no data entries
-        array[array == fill_value] = np.nan
-        # vertically flip array so tiff orientation is right (you just have to, try it)
-        array = array[::-1]
-        # actually do the gis to get the value within the shapefile
-        stats = rasterstats.zonal_stats(shp_path, array, affine=affine, nodata=np.nan, stats=stat)
-        tmp = [i['mean'] for i in stats if i['mean'] is not None]
-        timeseries.append((time, sum(tmp) / len(tmp)))
-
+    # if there is only one file, check for many time values
+    if len(files) == 1:
+        # open the files
+        nc_obj = netCDF4.Dataset(files[0], 'r')
+        # slice the time array to get a list of the time values
+        times = list(nc_obj[t_var][:].data)
+        # as we go through the sliced values we need to store the calculated values
+        values = []
+        # slice the variable's array, returns array with shape corresponding to dimension order and size
+        values_array = nc_obj[variable][:]
+        # roll axis brings the time dimension to the front so we can iterate over it
+        for values_2d in np.rollaxis(values_array, dim_order.index('t')):
+            # drop fill and no data entries
+            values_2d[values_2d == fill_value] = np.nan
+            # vertically flip array so the orientation is right (you just have to, try it)
+            values_2d = values_2d[::-1]
+            # actually do the gis to get the value within the shapefile
+            stats = rasterstats.zonal_stats(shp_path, values_2d, affine=affine, nodata=np.nan, stats=stat)
+            # if your shapefile has many polygons, you get many values back. average those values.
+            tmp = [i[stat] for i in stats if i[stat] is not None]
+            values.append(sum(tmp) / len(tmp))
+        # turn the times and values into a zipped series
+        timeseries = list(zip(times, values))
         nc_obj.close()
+
+    # if there were many files, iterate over each file extracting the value and time for each
+    else:
+        for file in files:
+            # open the file
+            nc_obj = netCDF4.Dataset(file, 'r')
+            # determine the correct datetime to use in the timeseries
+            time = datetime.datetime.strptime(os.path.basename(file), filename_pattern)
+
+            # this is the array of values for the nc_obj
+            array = np.asarray(nc_obj.variables[variable][:])
+            # if time was one of the dimensions, we need to remove it (3D to 2D)
+            if 't' in dim_order:
+                array = __slice_shape(array, dim_order, False)
+            # drop fill and no data entries
+            array[array == fill_value] = np.nan
+            # vertically flip array so tiff orientation is right (you just have to, try it)
+            array = array[::-1]
+            # actually do the gis to get the value within the shapefile
+            stats = rasterstats.zonal_stats(shp_path, array, affine=affine, nodata=np.nan, stats=stat)
+            tmp = [i['mean'] for i in stats if i['mean'] is not None]
+            timeseries.append((time, sum(tmp) / len(tmp)))
+
+            nc_obj.close()
 
     # sort the list by the 0 entry (the date), turn it into a pd dataframe, return it
     timeseries.sort(key=lambda tup: tup[0])
     return pd.DataFrame(timeseries, columns=['datetime', 'values'])
 
 
-def convert_to_geotiff(paths, variable, **kwargs):
-    """
-    :param variable: the short-code name of the variable within the netcdf
-    :param kwargs: save_dir - the name of the directory to save the files to
-    :return:
-        output_files: list of the full paths of the tifs that were created
-        geotransform: a dictionary of the dimensions of the output tifs
-    """
-    paths = __path_to_file_list(paths)
+def convert_to_geotiff(files, variable, **kwargs):
+    files = __path_to_file_list(files)
 
     # parse the optional argument from the kwargs
-    save_dir = kwargs.get('save_dir', os.path.dirname(paths[0]))
+    save_dir = kwargs.get('save_dir', os.path.dirname(files[0]))
     delete_sources = kwargs.get('delete_sources', False)
     fill_value = kwargs.get('fill_value', -9999)
 
     # open the first netcdf and collect georeferencing information
-    nc_obj = netCDF4.Dataset(paths[0], 'r')
+    nc_obj = netCDF4.Dataset(files[0], 'r')
     lat = nc_obj.variables['lat'][:]
     lon = nc_obj.variables['lon'][:]
     lon_min = lon.min()
@@ -192,13 +254,13 @@ def convert_to_geotiff(paths, variable, **kwargs):
     output_files = []
 
     # Create a geotiff for each netcdf in the list of files
-    for path in paths:
-        # set the paths to open/save
-        save_path = os.path.join(save_dir, os.path.basename(path) + '.tif')
+    for file in files:
+        # set the files to open/save
+        save_path = os.path.join(save_dir, os.path.basename(file) + '.tif')
         output_files.append(save_path)
 
         # open the netcdf and get the data array
-        nc_obj = netCDF4.Dataset(path, 'r')
+        nc_obj = netCDF4.Dataset(file, 'r')
         array = np.asarray(nc_obj[variable][:])
         array = array[0]
         array[array == fill_value] = np.nan  # If you have fill values, change the comparator to git rid of it
@@ -207,7 +269,7 @@ def convert_to_geotiff(paths, variable, **kwargs):
 
         # if you want to delete the source netcdfs as you go
         if delete_sources:
-            os.remove(path)
+            os.remove(file)
 
         # write it to a geotiff
         with rasterio.open(
@@ -302,20 +364,32 @@ def __get_dimension_order(dimensions, x_var, y_var, t_var):
         raise ValueError('Your data should have either 2 (x,y) or 3 (x,y,time) dimensions')
 
 
-def __slice_point(nc_var, dim_order, x_index, y_index):
+def __slice_point(nc_var, dim_order, x_index, y_index, time_index=False):
     if dim_order == 'txy':
+        if time_index:
+            return nc_var[:, x_index, y_index].data
         return nc_var[0, x_index, y_index].data
     elif dim_order == 'tyx':
+        if time_index:
+            return nc_var[:, y_index, x_index].data
         return nc_var[0, y_index, x_index].data
 
     elif dim_order == 'xyt':
+        if time_index:
+            return nc_var[x_index, y_index, :].data
         return nc_var[x_index, y_index, 0].data
     elif dim_order == 'yxt':
+        if time_index:
+            return nc_var[y_index, x_index, :].data
         return nc_var[y_index, x_index, 0].data
 
     elif dim_order == 'xty':
+        if time_index:
+            return nc_var[x_index, :, y_index].data
         return nc_var[x_index, 0, y_index].data
     elif dim_order == 'ytx':
+        if time_index:
+            return nc_var[y_index, :, x_index].data
         return nc_var[y_index, 0, x_index].data
 
     elif dim_order == 'xy':
@@ -326,20 +400,32 @@ def __slice_point(nc_var, dim_order, x_index, y_index):
         raise ValueError('Unrecognized order of dimensions, unable to slice netCDF array.')
 
 
-def __slice_box(nc_var, dim_order, xmin_index, ymin_index, xmax_index, ymax_index):
+def __slice_box(nc_var, dim_order, xmin_index, ymin_index, xmax_index, ymax_index, time_index=False):
     if dim_order == 'txy':
+        if time_index:
+            return nc_var[:, xmin_index:xmax_index, ymin_index:ymax_index].data
         return nc_var[0, xmin_index:xmax_index, ymin_index:ymax_index].data
     elif dim_order == 'tyx':
+        if time_index:
+            return nc_var[:, ymin_index:ymax_index, xmin_index:xmax_index].data
         return nc_var[0, ymin_index:ymax_index, xmin_index:xmax_index].data
 
     elif dim_order == 'xyt':
+        if time_index:
+            return nc_var[xmin_index:xmax_index, ymin_index:ymax_index, :].data
         return nc_var[xmin_index:xmax_index, ymin_index:ymax_index, 0].data
     elif dim_order == 'yxt':
+        if time_index:
+            return nc_var[ymin_index:ymax_index, xmin_index:xmax_index, :].data
         return nc_var[ymin_index:ymax_index, xmin_index:xmax_index, 0].data
 
     elif dim_order == 'xty':
+        if time_index:
+            return nc_var[xmin_index:xmax_index, :, ymin_index:ymax_index].data
         return nc_var[xmin_index:xmax_index, 0, ymin_index:ymax_index].data
     elif dim_order == 'ytx':
+        if time_index:
+            return nc_var[ymin_index:ymax_index, :, xmin_index:xmax_index].data
         return nc_var[ymin_index:ymax_index, 0, xmin_index:xmax_index].data
 
     elif dim_order == 'xy':
@@ -351,6 +437,7 @@ def __slice_box(nc_var, dim_order, xmin_index, ymin_index, xmax_index, ymax_inde
 
 
 def __slice_shape(array, dim_order):
+    # Gets rid of the time dimension in an array coming from a netcdf
     if dim_order == 'txy':
         return array[0, :, :]
     elif dim_order == 'tyx':
