@@ -8,8 +8,36 @@ import pandas as pd
 import rasterio
 import rasterstats
 
+__all__ = ['point_series', 'box_series', 'shp_series', 'convert_to_geotiff']
+
 
 def point_series(path, variable, coordinates, filename_pattern=None, **kwargs):
+    """
+    Creates a timeseries of values at the grid cell closest to a specified point.
+
+    Args:
+        path: Either 1) the absolute path to a directory containing netcdfs named by date or 2) the absolute path to
+            a single netcdf containing many time values for a specified variable
+        variable: The name of a variable as it is stored in the netcdf e.g. 'temp' instead of Temperature
+        coordinates: A tuple of the format (x_value, y_value) where the xy values are in terms of the x and y
+            coordinate variables used by the netcdf.
+        filename_pattern: A string for parsing the date from the names of netcdf files see also
+            `datetime documentation <https://docs.python.org/3.8/library/datetime.html#strftime-and-strptime-behavior>`_
+
+    Keyword Args:
+        xvar: Name of the x coordinate variable used to spatial reference the netcdf array. Default: 'lon' (longitude)
+        yvar: Name of the y coordinate variable used to spatial reference the netcdf array. Default: 'lat' (latitude)
+        tvar: Name of the time coordinate variable used for time referencing the netcdf. Default: 'time'
+        fill_value: The value used for filling no_data spaces in the array. Default: -9999
+
+    Returns:
+        pandas.DataFrame
+
+    Examples:
+        .. code-block:: python
+
+            data = geomatics.netcdfs.point_series('/path/to/netcdf/', 'AirTemp', (10, 20))
+    """
     # for customizing the workflow for standards non-compliant netcdf files
     x_var = kwargs.get('xvar', 'lon')
     y_var = kwargs.get('yvar', 'lat')
@@ -65,6 +93,33 @@ def point_series(path, variable, coordinates, filename_pattern=None, **kwargs):
 
 
 def box_series(path, variable, coordinates, filename_pattern=None, **kwargs):
+    """
+    Creates a timeseries of values based on values within a bounding box specified by your coordinates.
+
+    Args:
+        path: Either 1) the absolute path to a directory containing netcdfs named by date or 2) the absolute path to
+            a single netcdf containing many time values for a specified variable
+        variable: The name of a variable as it is stored in the netcdf e.g. 'temp' instead of Temperature
+        coordinates: A tuple of the format (min_x_value, min_y_value, max_x_value, max_y_value) where the xy values
+            are in terms of the x and y coordinate variables used by the netcdf.
+        filename_pattern: A string for parsing the date from the names of netcdf files see also
+            `datetime documentation <https://docs.python.org/3.8/library/datetime.html#strftime-and-strptime-behavior>`_
+
+    Keyword Args:
+        xvar: Name of the x coordinate variable used to spatial reference the netcdf array. Default: 'lon' (longitude)
+        yvar: Name of the y coordinate variable used to spatial reference the netcdf array. Default: 'lat' (latitude)
+        tvar: Name of the time coordinate variable used for time referencing the netcdf. Default: 'time'
+        fill_value: The value used for filling no_data spaces in the array. Default: -9999
+        stat_type: The stats method to turn the values within the bounding box into a single value. Default: 'mean'
+
+    Returns:
+        pandas.DataFrame
+
+    Examples:
+        .. code-block:: python
+
+            data = geomatics.netcdfs.box_series('/path/to/netcdf/', 'AirTemp', (10, 20, 15, 25))
+    """
     # for customizing the workflow for standards non-compliant netcdf files
     x_var = kwargs.get('xvar', 'lon')
     y_var = kwargs.get('yvar', 'lat')
@@ -125,7 +180,8 @@ def box_series(path, variable, coordinates, filename_pattern=None, **kwargs):
             # determine the correct datetime to use in the timeseries
             time = datetime.datetime.strptime(os.path.basename(file), filename_pattern)
             # slice the values_array, drop nan values
-            values_array = __slice_box(nc_obj[variable], dim_order, xmin_index, ymin_index, xmax_index, ymax_index, False)
+            values_array = __slice_box(nc_obj[variable], dim_order, xmin_index, ymin_index, xmax_index, ymax_index,
+                                       False)
             # replace the fill values with numpy nan
             values_array[values_array == fill_value] = np.nan
             values_array = values_array.flatten()
@@ -149,6 +205,32 @@ def box_series(path, variable, coordinates, filename_pattern=None, **kwargs):
 
 
 def shp_series(path, variable, shp_path, filename_pattern=None, **kwargs):
+    """
+    Creates a timeseries of values within the boundaries of your polygon shapefile of the same coordinate system.
+
+    Args:
+        path: Either 1) the absolute path to a directory containing netcdfs named by date or 2) the absolute path to
+            a single netcdf containing many time values for a specified variable
+        variable: The name of a variable as it is stored in the netcdf e.g. 'temp' instead of Temperature
+        shp_path: An absolute path to the .shp file in a shapefile. Must be in Geographic Coordinate System WGS 1984
+        filename_pattern: A string for parsing the date from the names of netcdf files see also
+            `datetime documentation <https://docs.python.org/3.8/library/datetime.html#strftime-and-strptime-behavior>`_
+
+    Keyword Args:
+        xvar: Name of the x coordinate variable used to spatial reference the netcdf array. Default: 'lon' (longitude)
+        yvar: Name of the y coordinate variable used to spatial reference the netcdf array. Default: 'lat' (latitude)
+        tvar: Name of the time coordinate variable used for time referencing the netcdf. Default: 'time'
+        fill_value: The value used for filling no_data spaces in the array. Default: -9999
+        stat_type: The stats method to turn the values within the bounding box into a single value. Default: 'mean'
+
+    Returns:
+        pandas.DataFrame
+
+    Examples:
+        .. code-block:: python
+
+            data = geomatics.netcdfs.shp_series('/path/to/netcdf/', 'AirTemp', '/path/to/shapefile.shp')
+    """
     # for customizing the workflow for standards non-compliant netcdf files
     x_var = kwargs.get('xvar', 'lon')
     y_var = kwargs.get('yvar', 'lat')
@@ -226,6 +308,16 @@ def shp_series(path, variable, shp_path, filename_pattern=None, **kwargs):
 
 
 def convert_to_geotiff(files, variable, **kwargs):
+    """
+
+    Args:
+        files:
+        variable:
+        **kwargs:
+
+    Returns:
+
+    """
     files = __path_to_file_list(files)
 
     # parse the optional argument from the kwargs
