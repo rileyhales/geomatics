@@ -1,7 +1,7 @@
 geomatics
 =========
 .. image:: https://img.shields.io/pypi/v/geoglows
-        :target: https://pypi.org/project/geoglows
+        :target: https://pypi.org/project/geomatics
 .. image:: https://anaconda.org/rileyhales/geomatics/badges/version.svg
         :target: https://anaconda.org/rileyhales/geomatics
 
