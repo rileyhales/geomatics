@@ -6,3 +6,4 @@ API Documentation
    :maxdepth: 3
 
    netcdfs
+   geojsons

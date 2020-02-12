@@ -1,5 +1,4 @@
 # -- Path setup --------------------------------------------------------------
-
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -14,7 +13,7 @@ copyright = '2020, Riley Hales'
 author = 'Riley Hales'
 
 # The full version, including alpha/beta/rc tags
-release = '0.2'
+release = '0.3'
 master_doc = 'index'
 
 # -- General configuration ---------------------------------------------------

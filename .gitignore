@@ -8,3 +8,4 @@ dev.ipynb
 geomatics.egg-info
 dist
 .pypirc
+test_data

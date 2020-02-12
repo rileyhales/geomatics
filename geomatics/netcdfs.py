@@ -290,7 +290,7 @@ def shp_series(path, variable, shp_path, filename_pattern=None, **kwargs):
             array = np.asarray(nc_obj.variables[variable][:])
             # if time was one of the dimensions, we need to remove it (3D to 2D)
             if 't' in dim_order:
-                array = __slice_shape(array, dim_order, False)
+                array = __slice_shape(array, dim_order)
             # drop fill and no data entries
             array[array == fill_value] = np.nan
             # vertically flip array so tiff orientation is right (you just have to, try it)
