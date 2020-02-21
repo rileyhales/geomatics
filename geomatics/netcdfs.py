@@ -87,9 +87,9 @@ def point_series(path, variable, coordinates, filename_pattern=None, **kwargs):
             timeseries.append((time, val))
             nc_obj.close()
 
-    # sort the list by the 0 entry (the date), turn it into a pd dataframe, return it
-    timeseries.sort(key=lambda tup: tup[0])
-    return pd.DataFrame(timeseries, columns=['datetime', 'values'])
+    # unzip the timeseries
+    timeseries = list(zip(*timeseries))
+    return pd.DataFrame(timeseries[1], columns=['values'], index=timeseries[0])
 
 
 def box_series(path, variable, coordinates, filename_pattern=None, **kwargs):
@@ -199,9 +199,9 @@ def box_series(path, variable, coordinates, filename_pattern=None, **kwargs):
 
         nc_obj.close()
 
-    # sort the list by the 0 entry (the date), turn it into a pd dataframe, return it
-    timeseries.sort(key=lambda tup: tup[0])
-    return pd.DataFrame(timeseries, columns=['datetime', 'values'])
+    # unzip the timeseries
+    timeseries = list(zip(*timeseries))
+    return pd.DataFrame(timeseries[1], columns=['values'], index=timeseries[0])
 
 
 def shp_series(path, variable, shp_path, filename_pattern=None, **kwargs):
@@ -302,9 +302,9 @@ def shp_series(path, variable, shp_path, filename_pattern=None, **kwargs):
 
             nc_obj.close()
 
-    # sort the list by the 0 entry (the date), turn it into a pd dataframe, return it
-    timeseries.sort(key=lambda tup: tup[0])
-    return pd.DataFrame(timeseries, columns=['datetime', 'values'])
+    # unzip the timeseries
+    timeseries = list(zip(*timeseries))
+    return pd.DataFrame(timeseries[1], columns=['values'], index=timeseries[0])
 
 
 def convert_to_geotiff(files, variable, **kwargs):
