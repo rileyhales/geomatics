@@ -8,7 +8,9 @@ import pandas as pd
 import rasterio
 import rasterstats
 
-__all__ = ['point_series', 'box_series', 'shp_series', 'convert_to_geotiff']
+from .__utilities import path_to_file_list
+
+__all__ = ['point_series', 'box_series', 'shp_series']
 
 
 def point_series(path, variable, coordinates, filename_pattern=None, **kwargs):
@@ -45,7 +47,7 @@ def point_series(path, variable, coordinates, filename_pattern=None, **kwargs):
     fill_value = kwargs.get('fill_value', -9999)
 
     # confirm that a valid path to data was provided
-    files = __path_to_file_list(path)
+    files = path_to_file_list(path, 'nc')
     files.sort()
 
     # get a list of the x&y coordinates in the netcdfs using the first file as a reference
@@ -128,7 +130,7 @@ def box_series(path, variable, coordinates, filename_pattern=None, **kwargs):
     stat = kwargs.get('stat_type', 'mean')
 
     # confirm that a valid path to data was provided
-    files = __path_to_file_list(path)
+    files = path_to_file_list(path, 'nc')
     files.sort()
 
     # get a list of the x&y coordinates using the first file as a reference
@@ -239,7 +241,7 @@ def shp_series(path, variable, shp_path, filename_pattern=None, **kwargs):
     stat = kwargs.get('stat_type', 'mean')
 
     # confirm that a valid path to data was provided
-    files = __path_to_file_list(path)
+    files = path_to_file_list(path, 'nc')
     files.sort()
 
     # open the netcdf determine the affine transformation of the netcdf grids
@@ -305,99 +307,6 @@ def shp_series(path, variable, shp_path, filename_pattern=None, **kwargs):
     # unzip the timeseries
     timeseries = list(zip(*timeseries))
     return pd.DataFrame(timeseries[1], columns=['values'], index=timeseries[0])
-
-
-def convert_to_geotiff(files, variable, **kwargs):
-    """
-
-    Args:
-        files:
-        variable:
-        **kwargs:
-
-    Returns:
-
-    """
-    files = __path_to_file_list(files)
-
-    # parse the optional argument from the kwargs
-    save_dir = kwargs.get('save_dir', os.path.dirname(files[0]))
-    delete_sources = kwargs.get('delete_sources', False)
-    fill_value = kwargs.get('fill_value', -9999)
-
-    # open the first netcdf and collect georeferencing information
-    nc_obj = netCDF4.Dataset(files[0], 'r')
-    lat = nc_obj.variables['lat'][:]
-    lon = nc_obj.variables['lon'][:]
-    lon_min = lon.min()
-    lon_max = lon.max()
-    lat_min = lat.min()
-    lat_max = lat.max()
-    data = nc_obj[variable][:]
-    data = data[0]
-    height = data.shape[0]
-    width = data.shape[1]
-    nc_obj.close()
-
-    # Geotransform for each of the netcdf files
-    gt = rasterio.transform.from_bounds(lon_min, lat_min, lon_max, lat_max, width, height)
-
-    # A list of all the files that get written which can be returned
-    output_files = []
-
-    # Create a geotiff for each netcdf in the list of files
-    for file in files:
-        # set the files to open/save
-        save_path = os.path.join(save_dir, os.path.basename(file) + '.tif')
-        output_files.append(save_path)
-
-        # open the netcdf and get the data array
-        nc_obj = netCDF4.Dataset(file, 'r')
-        array = np.asarray(nc_obj[variable][:])
-        array = array[0]
-        array[array == fill_value] = np.nan  # If you have fill values, change the comparator to git rid of it
-        array = np.flip(array, axis=0)
-        nc_obj.close()
-
-        # if you want to delete the source netcdfs as you go
-        if delete_sources:
-            os.remove(file)
-
-        # write it to a geotiff
-        with rasterio.open(
-                save_path,
-                'w',
-                driver='GTiff',
-                height=data.shape[0],
-                width=data.shape[1],
-                count=1,
-                dtype=data.dtype,
-                nodata=np.nan,
-                crs='+proj=latlong',
-                transform=gt,
-        ) as dst:
-            dst.write(array, 1)
-
-    return output_files, dict(
-        lon_min=lon_min, lon_max=lon_max, lat_min=lat_min, lat_max=lat_max, height=height, width=width)
-
-
-def __path_to_file_list(path):
-    # check that a valid path was provided
-    if isinstance(path, str):
-        if os.path.isfile(path):
-            return [path]
-        elif os.path.isdir(path):
-            files = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('.nc') or f.endswith('.nc4')]
-            if len(files) == 0:
-                raise FileNotFoundError('No netcdfs located within this directory')
-            return files
-        else:
-            raise FileNotFoundError('No netcdf file or directory found at this path')
-    elif isinstance(path, list):
-        return path
-    else:
-        raise ValueError('Provide an absolute file path to a netcdf or directory of netcdf files, or a list of paths')
 
 
 def __guess_timedelta(nc_obj, t_var, step=1):

@@ -1,6 +1,6 @@
 package:
   name: geomatics
-  version: 0.4
+  version: 0.5
 
 about:
   author: Riley Hales
@@ -30,6 +30,7 @@ requirements:
     - python-dateutil
     - numpy
     - pandas
+    - pyshp
 
 outputs:
   - name: geomatics

@@ -6,7 +6,7 @@ with open("README.md", "r") as readme:
 setup(
     name='geomatics',
     packages=['geomatics'],
-    version='0.4',
+    version='0.5',
     description='GIS tools developed by Riley Hales for the BYU Hydroinformatics Lab',
     long_description=long_description,
     long_description_content_type="text/markdown",

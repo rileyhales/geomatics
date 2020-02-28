@@ -7,3 +7,4 @@ API Documentation
 
    netcdfs
    geojsons
+   geotiffs
