@@ -6,5 +6,6 @@ API Documentation
    :maxdepth: 3
 
    netcdfs
+   gribs
    geojsons
    geotiffs

@@ -7,8 +7,8 @@ def path_to_file_list(path, filetype):
         filters = ['*.nc', '*.nc4']
     elif filetype in ('grib', 'grb'):
         filters = ['*.grib', '*.grb']
-    elif filetype in ('geotiff', 'tiff'):
-        filters = ['*.geotiff', '*.gtiff', '*.tiff']
+    elif filetype in ('geotiff', 'tiff', 'tif'):
+        filters = ['*.geotiff', '*.gtiff', '*.tiff', '*.tif']
     else:
         raise ValueError('Unconfigured filter type')
 

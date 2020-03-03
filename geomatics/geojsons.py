@@ -2,6 +2,8 @@ import json
 import shapefile
 import requests
 
+__all__ = ['geojson_to_shp', 'request_livingatlas_geojson']
+
 
 def geojson_to_shp(geojson, savepath):
     """

@@ -10,7 +10,50 @@ import rasterstats
 
 from .__utilities import path_to_file_list
 
-__all__ = ['point_series', 'box_series', 'shp_series']
+__all__ = ['inspect', 'point_series', 'box_series', 'shp_series']
+
+
+def inspect(path):
+    """
+    Prints lots of messages showing information about variables, dimensions, and metadata
+
+    Args:
+        path: The path to a single netcdf file.
+    """
+    nc = netCDF4.Dataset(path, 'r', clobber=False, diskless=True, persist=False)
+
+    print("This is your netCDF python object")
+    print(nc)
+    print()
+
+    print("There are " + str(len(nc.variables)) + " variables")       # The number of variables
+    print("There are " + str(len(nc.dimensions)) + " dimensions")     # The number of dimensions
+    print()
+
+    print('These are the global attributes of the netcdf file')
+    print(nc.__dict__)                                    # access the global attributes of the netcdf file
+    print()
+
+    print("Detailed view of each variable")
+    print()
+    variables = {}
+    for variable in nc.variables.keys():                  # .keys() gets the name of each variable
+        print('Variable Name:  ' + variable)              # The string name of the variable
+        print('The view of this variable in the netCDF python object')
+        print(nc[variable])                               # How to view the variable information (netcdf obj)
+        print('The data array stored in this variable')
+        print(nc[variable][:])                            # Access the numpy array inside the variable (array)
+        print('The dimensions associated with this variable')
+        print(nc[variable].dimensions)                    # Get the dimensions associated with a variable (tuple)
+        print('The metadata associated with this variable')
+        print(nc[variable].__dict__)                      # How to get the attributes of a variable (dictionary)
+        print()
+
+    for dimension in nc.dimensions.keys():
+        print(nc.dimensions[dimension].size)              # print the size of a dimension
+
+    nc.close()                                            # close the file connection to the file
+    return
 
 
 def point_series(path, variable, coordinates, filename_pattern=None, **kwargs):

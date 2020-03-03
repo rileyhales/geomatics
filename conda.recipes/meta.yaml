@@ -1,6 +1,6 @@
 package:
   name: geomatics
-  version: 0.5
+  version: 0.6
 
 about:
   author: Riley Hales
@@ -19,18 +19,18 @@ source:
 
 requirements:
   build:
-    - python
+    - python>=3
   run:
     - python>=3
     - rasterio
     - rasterstats
-    - xarray
     - netcdf4
     - requests
     - python-dateutil
     - numpy
     - pandas
     - pyshp
+    - pygrib
 
 outputs:
   - name: geomatics
