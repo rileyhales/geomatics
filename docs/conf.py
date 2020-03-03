@@ -32,6 +32,20 @@ autodoc_default_options = {
     # 'members': 'point_series, box_series, shp_series',
     'member-order': 'bysource',
 }
+autodoc_mock_imports = [
+    'rasterio',
+    'rasterstats',
+    'netCDF4',
+    'python-dateutil',
+    'dateutil',
+    'numpy',
+    'pandas',
+    'pygrib',
+    'pyshp',
+    'shapefile',
+    'pyproj',
+]
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
