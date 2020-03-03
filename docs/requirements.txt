@@ -2,8 +2,9 @@ sphinx
 sphinx_rtd_theme
 rasterio
 rasterstats
-xarray
 netcdf4
 python-dateutil
 numpy
 pandas
+pygrib
+pyshp
