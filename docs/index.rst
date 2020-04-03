@@ -5,6 +5,13 @@ geomatics
 .. image:: https://anaconda.org/rileyhales/geomatics/badges/version.svg
         :target: https://anaconda.org/rileyhales/geomatics
 
+.. code-block::
+
+    # from pypi
+    pip install geomatics
+    # from conda
+    conda install -c rileyhales geomatics
+
 .. toctree::
     :caption: Table of Contents
     :name: mastertoc
