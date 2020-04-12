@@ -1,12 +1,14 @@
 from setuptools import setup
 
+version = '0.6.1'
+
 with open("README.md", "r") as readme:
     long_description = readme.read()
 
 setup(
     name='geomatics',
     packages=['geomatics'],
-    version='0.6',
+    version=version,
     description='GIS tools developed by Riley Hales for the BYU Hydroinformatics Lab',
     long_description=long_description,
     long_description_content_type="text/markdown",
