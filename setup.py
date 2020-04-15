@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = '0.6.1'
+version = '0.7'
 
 with open("README.md", "r") as readme:
     long_description = readme.read()
@@ -9,7 +9,8 @@ setup(
     name='geomatics',
     packages=['geomatics'],
     version=version,
-    description='GIS tools developed by Riley Hales for the BYU Hydroinformatics Lab',
+    description='Geospatial tools in pure python developed by Riley Hales as part of a Master\'s Thesis '
+                'at Brigham Young University',
     long_description=long_description,
     long_description_content_type="text/markdown",
     author='Riley Hales',

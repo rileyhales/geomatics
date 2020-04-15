@@ -1,5 +1,5 @@
 {% set name = "geomatics" %}
-{% set version = "0.6.1" %}
+{% set version = "0.7" %}
 
 package:
   name: {{ name|lower }}
@@ -7,7 +7,8 @@ package:
 
 source:
   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
-  sha256: 695bef61dad70fe1d9edbaccca99f333fb8eb4c635f614cae6fa0363744969bb
+  sha256: auto_generated_hash
+#  path: ..
 
 build:
   number: 0
@@ -36,7 +37,7 @@ test:
 
 about:
   home: https://github.com/rileyhales/geomatics
-  summary: GIS tools developed by Riley Hales for the BYU Hydroinformatics Lab
+  summary: Geospatial tools in pure python developed by Riley Hales as part of a Master's Thesis at Brigham Young University
   license: BSD-3-Clause
   license_family: BSD
   license_file: LICENSE

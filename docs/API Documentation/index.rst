@@ -5,7 +5,8 @@ API Documentation
 .. toctree::
    :maxdepth: 3
 
-   netcdfs
-   gribs
-   geojsons
+   convert
+   data
    geotiffs
+   gribs
+   netcdfs

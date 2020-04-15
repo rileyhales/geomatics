@@ -1,5 +1,6 @@
 import geomatics.__utilities
-import geomatics.geojsons
+import geomatics.convert
 import geomatics.geotiffs
+import geomatics.data
 import geomatics.gribs
 import geomatics.netcdfs

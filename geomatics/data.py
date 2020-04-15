@@ -1,66 +1,66 @@
-import json
-import shapefile
 import requests
+import datetime
+import os
+import json
 
-__all__ = ['geojson_to_shp', 'request_livingatlas_geojson']
+__all__ = ['download_noaa_gfs', 'get_livingatlas_geojson']
 
 
-def geojson_to_shp(geojson, savepath):
+def download_noaa_gfs(save_path, steps):
     """
-    Turns a valid dict, json, or geojson containing polygon data in a geographic coordinate system into a shapefile
+    Downloads Grib files containing the latest NOAA GFS forecast. The files are saved to a specified directory and are
+        named for the timestamp of the forecast and the time that the forecast is predicting for. The timestamps are in
+        YYYYMMDDHH time format. E.G a file named gfs_2020010100_2020010512.grb means that the file contains data from
+        the forecast created Jan 1 2020 at 00:00:00 for the time Jan 5 2020 at 12PM.
 
     Args:
-        geojson: a valid geojson as a dictionary or json python object
-        savepath: the full file path to save the shapefile to, including the file_name.shp
+        save_path: an absolute file path to the directory where you want to save the gfs files
+        steps: the number of 6 hour forecast steps to download. E.g. 4 steps = 1 day
 
     Returns:
-
+        None
     """
-    # turn the geojson into a dictionary if it isn't
-    if not isinstance(geojson, dict):
-        try:
-            geojson = json.loads(geojson)
-        except json.JSONDecodeError:
-            raise Exception('Unable to extract a dictionary or json like object from the argument geojson')
-
-    # create the shapefile
-    fileobject = shapefile.Writer(target=savepath, shpType=shapefile.POLYGON, autoBalance=True)
-
-    # label all the columns in the .dbf
-    geomtype = geojson['features'][0]['geometry']['type']
-    if geojson['features'][0]['properties']:
-        for attribute in geojson['features'][0]['properties']:
-            fileobject.field(str(attribute), 'C', '30')
+    # determine which forecast we should be looking for
+    now = datetime.datetime.utcnow() - datetime.timedelta(hours=4)
+    if now.hour >= 18:
+        fc_hour = '18'
+    elif now.hour >= 12:
+        fc_hour = '12'
+    elif now.hour >= 6:
+        fc_hour = '06'
     else:
-        fileobject.field('Name', 'C', '50')
+        fc_hour = '00'
+    fc_date = now.strftime('%Y%m%d')
+    timestamp = datetime.datetime.strptime(fc_date + fc_hour, '%Y%m%d%H')
 
-    # add the geometry and attribute data
-    for feature in geojson['features']:
-        # record the geometry
-        if geomtype == 'Polygon':
-            fileobject.poly(polys=feature['geometry']['coordinates'])
-        elif geomtype == 'MultiPolygon':
-            for i in feature['geometry']['coordinates']:
-                fileobject.poly(polys=i)
+    fc_time_steps = []
+    for step in range(steps):
+        step = str(6 * (step + 1))
+        while len(step) < 3:
+            step = '0' + step
+        fc_time_steps.append(step)
 
-        # record the attributes in the .dbf
-        if feature['properties']:
-            fileobject.record(**feature['properties'])
-        else:
-            fileobject.record('unknown')
+    for step in fc_time_steps:
+        # build the url to download the file from
+        url = 'https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl?file=gfs.t' + fc_hour + 'z.pgrb2.0p25.f' + \
+              step + '&all_lev=on&all_var=on&dir=%2Fgfs.' + fc_date + '%2F' + fc_hour
 
-    # close writing to the shapefile
-    fileobject.close()
+        # set the file name: gfs_DATEofFORECAST_TIMESTEPofFORECAST.grb
+        file_timestep = timestamp + datetime.timedelta(hours=int(step))
+        filename = 'gfs_{0}_{1}.grb'.format(timestamp.strftime('%Y%m%d%H'), file_timestep.strftime("%Y%m%d%H"))
+        filepath = os.path.join(save_path, filename)
 
-    # create a prj file
-    with open(savepath + '.prj', 'w') as prj:
-        prj.write('GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],'
-                  'PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]')
-
+        # download the file
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(filepath, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=10240):
+                    if chunk:
+                        f.write(chunk)
     return
 
 
-def request_livingatlas_geojson(location):
+def get_livingatlas_geojson(location):
     """
     Requests a geojson from the ESRI living atlas services for World Regions or Generalized Country Boundaries
 
@@ -69,7 +69,6 @@ def request_livingatlas_geojson(location):
 
     Returns:
         a json python object, dict like
-
     """
     countries = [
         'Afghanistan', 'Albania', 'Algeria', 'American Samoa', 'Andorra', 'Angola', 'Anguilla', 'Antarctica',

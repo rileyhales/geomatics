@@ -13,7 +13,7 @@ copyright = '2020, Riley Hales'
 author = 'Riley Hales'
 
 # The full version, including alpha/beta/rc tags
-release = '0.6'
+release = '0.7'
 master_doc = 'index'
 
 # -- General configuration ---------------------------------------------------
@@ -29,7 +29,6 @@ extensions = [
 ]
 
 autodoc_default_options = {
-    # 'members': 'point_series, box_series, shp_series',
     'member-order': 'bysource',
 }
 autodoc_mock_imports = [
