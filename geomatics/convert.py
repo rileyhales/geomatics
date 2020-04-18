@@ -6,8 +6,6 @@ import pygrib
 import numpy as np
 import rasterio
 
-from .__utilities import path_to_file_list
-
 __all__ = ['geojson_to_shapefile', 'netcdf_to_geotiff', 'grib_to_geotiff']
 
 
@@ -20,7 +18,7 @@ def geojson_to_shapefile(geojson, savepath):
         savepath: the full file path to save the shapefile to, including the file_name.shp
 
     Returns:
-
+        None
     """
     # turn the geojson into a dictionary if it isn't
     if not isinstance(geojson, dict):
@@ -66,6 +64,7 @@ def geojson_to_shapefile(geojson, savepath):
     return
 
 
+# todo
 def netcdf_to_geotiff(path, variable, **kwargs):
     """
     Converts a certain variable in netcdf files to a geotiff. Assumes WGS1984 GCS.
@@ -153,6 +152,7 @@ def netcdf_to_geotiff(path, variable, **kwargs):
     return output_files, affine
 
 
+# todo
 def grib_to_geotiff(path, band_number, **kwargs):
     """
     Converts a certain band number in grib files to geotiffs. Assumes WGS1984 GCS.
@@ -222,3 +222,8 @@ def grib_to_geotiff(path, band_number, **kwargs):
             os.remove(file)
 
     return output_files, affine
+
+
+# todo
+def grib_to_netcdf():
+    return

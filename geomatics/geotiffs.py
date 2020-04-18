@@ -4,11 +4,10 @@ import rasterio
 import numpy as np
 from rasterio.enums import Resampling
 
-from .__utilities import path_to_file_list
-
 __all__ = ['upsample']
 
 
+# todo
 def upsample(path, scale):
     """
     Performs array math to artificially increase the resolution of a geotiff. No interpolation or value resampling.

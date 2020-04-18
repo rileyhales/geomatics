@@ -1,12 +1,13 @@
-import requests
 import datetime
-import os
 import json
+import os
 
-__all__ = ['download_noaa_gfs', 'get_livingatlas_geojson']
+import requests
+
+__all__ = ['download_noaa_gfs', 'get_livingatlas_geojson', 'detect_type']
 
 
-def download_noaa_gfs(save_path, steps):
+def download_noaa_gfs(save_path: str, steps: int):
     """
     Downloads Grib files containing the latest NOAA GFS forecast. The files are saved to a specified directory and are
         named for the timestamp of the forecast and the time that the forecast is predicting for. The timestamps are in
@@ -18,7 +19,7 @@ def download_noaa_gfs(save_path, steps):
         steps: the number of 6 hour forecast steps to download. E.g. 4 steps = 1 day
 
     Returns:
-        None
+        List of absolute paths to the files that were downloaded
     """
     # determine which forecast we should be looking for
     now = datetime.datetime.utcnow() - datetime.timedelta(hours=4)
@@ -33,6 +34,7 @@ def download_noaa_gfs(save_path, steps):
     fc_date = now.strftime('%Y%m%d')
     timestamp = datetime.datetime.strptime(fc_date + fc_hour, '%Y%m%d%H')
 
+    # create a list of the 3 digit string forecast time steps/intervals
     fc_time_steps = []
     for step in range(steps):
         step = str(6 * (step + 1))
@@ -40,6 +42,8 @@ def download_noaa_gfs(save_path, steps):
             step = '0' + step
         fc_time_steps.append(step)
 
+    # actually downloading the data
+    downloaded_files = []
     for step in fc_time_steps:
         # build the url to download the file from
         url = 'https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl?file=gfs.t' + fc_hour + 'z.pgrb2.0p25.f' + \
@@ -49,6 +53,7 @@ def download_noaa_gfs(save_path, steps):
         file_timestep = timestamp + datetime.timedelta(hours=int(step))
         filename = 'gfs_{0}_{1}.grb'.format(timestamp.strftime('%Y%m%d%H'), file_timestep.strftime("%Y%m%d%H"))
         filepath = os.path.join(save_path, filename)
+        downloaded_files.append(filepath)
 
         # download the file
         with requests.get(url, stream=True) as r:
@@ -57,10 +62,10 @@ def download_noaa_gfs(save_path, steps):
                 for chunk in r.iter_content(chunk_size=10240):
                     if chunk:
                         f.write(chunk)
-    return
+    return downloaded_files
 
 
-def get_livingatlas_geojson(location):
+def get_livingatlas_geojson(location: str) -> dict:
     """
     Requests a geojson from the ESRI living atlas services for World Regions or Generalized Country Boundaries
 
@@ -123,3 +128,14 @@ def get_livingatlas_geojson(location):
 
     req = requests.get(url=url)
     return json.loads(req.text)
+
+
+def detect_type(path: str) -> str:
+    if path.endswith('.nc') or path.endswith('.nc4'):
+        return 'netcdf'
+    elif path.endswith('.grb') or path.endswith('.grib'):
+        return 'grib'
+    elif path.endswith('.gtiff') or path.endswith('.tiff') or path.endswith('tif'):
+        return 'geotiff'
+    else:
+        raise ValueError('Unconfigured filter type')

@@ -21,6 +21,8 @@ requirements:
     - pip
   run:
     - python
+    - xarray
+    - cfgrib
     - rasterio
     - rasterstats
     - netCDF4
