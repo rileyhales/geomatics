@@ -2,17 +2,24 @@ import datetime
 import json
 import os
 
+import affine
+import h5py
 import requests
+import xarray as xr
 
-__all__ = ['download_noaa_gfs', 'get_livingatlas_geojson', 'detect_type']
+from ._utils import open_by_engine
+
+__all__ = ['download_noaa_gfs', 'get_livingatlas_geojson', 'gen_affine']
 
 
-def download_noaa_gfs(save_path: str, steps: int):
+def download_noaa_gfs(save_path: str, steps: int) -> list:
     """
     Downloads Grib files containing the latest NOAA GFS forecast. The files are saved to a specified directory and are
-        named for the timestamp of the forecast and the time that the forecast is predicting for. The timestamps are in
-        YYYYMMDDHH time format. E.G a file named gfs_2020010100_2020010512.grb means that the file contains data from
-        the forecast created Jan 1 2020 at 00:00:00 for the time Jan 5 2020 at 12PM.
+    named for the timestamp of the forecast and the time that the forecast is predicting for. The timestamps are in
+    YYYYMMDDHH time format. E.G a file named gfs_2020010100_2020010512.grb means that the file contains data from the
+    forecast created Jan 1 2020 at 00:00:00 for the time Jan 5 2020 at 12PM.
+
+    Files size is typically around 350 Mb per time step.
 
     Args:
         save_path: an absolute file path to the directory where you want to save the gfs files
@@ -46,8 +53,8 @@ def download_noaa_gfs(save_path: str, steps: int):
     downloaded_files = []
     for step in fc_time_steps:
         # build the url to download the file from
-        url = 'https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl?file=gfs.t' + fc_hour + 'z.pgrb2.0p25.f' + \
-              step + '&all_lev=on&all_var=on&dir=%2Fgfs.' + fc_date + '%2F' + fc_hour
+        url = f'https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl?file=' \
+              f'gfs.t{fc_hour}z.pgrb2.0p25.f{step}&all_lev=on&all_var=on&dir=%2Fgfs.{fc_date}%2F{fc_hour}'
 
         # set the file name: gfs_DATEofFORECAST_TIMESTEPofFORECAST.grb
         file_timestep = timestamp + datetime.timedelta(hours=int(step))
@@ -73,7 +80,7 @@ def get_livingatlas_geojson(location: str) -> dict:
         location: the name of the Country or World Region, properly spelled and capitalized
 
     Returns:
-        a json python object, dict like
+        dict
     """
     countries = [
         'Afghanistan', 'Albania', 'Algeria', 'American Samoa', 'Andorra', 'Angola', 'Anguilla', 'Antarctica',
@@ -122,7 +129,8 @@ def get_livingatlas_geojson(location: str) -> dict:
     if location in regions:
         url = base + 'World_Regions/FeatureServer/0/query?f=pgeojson&outSR=4326&where=REGION+%3D+%27' + location + '%27'
     elif location in countries:
-        url = base + 'World__Countries_Generalized_analysis_trim/FeatureServer/0/query?f=pgeojson&outSR=4326&where=NAME+%3D+%27' + location + '%27'
+        url = base + f'World__Countries_Generalized_analysis_trim/FeatureServer/0/query?' \
+                     f'f=pgeojson&outSR=4326&where=NAME+%3D+%27{location}%27'
     else:
         raise Exception('Country or World Region not recognized')
 
@@ -130,12 +138,44 @@ def get_livingatlas_geojson(location: str) -> dict:
     return json.loads(req.text)
 
 
-def detect_type(path: str) -> str:
-    if path.endswith('.nc') or path.endswith('.nc4'):
-        return 'netcdf'
-    elif path.endswith('.grb') or path.endswith('.grib'):
-        return 'grib'
-    elif path.endswith('.gtiff') or path.endswith('.tiff') or path.endswith('tif'):
-        return 'geotiff'
+def gen_affine(path: str,
+               x_var: str = 'lon',
+               y_var: str = 'lat',
+               engine: str = None,
+               xr_kwargs: dict = None,
+               h5_group: str = None) -> affine.Affine:
+    """
+    Creates an affine transform from the dimensions of the coordinate variable data in a netCDF file
+
+    Args:
+        path: An absolute paths to the data file
+        x_var: Name of the x coordinate variable used to spatial reference the array. Default: 'lon' (lon)
+        y_var: Name of the y coordinate variable used to spatial reference the array. Default: 'lat' (lat)
+        engine: the python package used to power the file reading
+        xr_kwargs: A dictionary of kwargs that you might need when opening complex grib files with xarray
+        h5_group: if all variables in the hdf5 file are in the same group, you can specify the name of the group here
+
+    Returns:
+        tuple(affine.Affine, width: int, height: int)
+    """
+    raster = open_by_engine(path, engine, xr_kwargs)
+    if isinstance(raster, xr.Dataset):  # xarray
+        lon = raster.variables[x_var][:]
+        lat = raster.variables[y_var][:]
+    elif isinstance(raster, h5py.Dataset):  # h5py
+        if h5_group is not None:
+            raster = raster[h5_group]
+        lon = raster[x_var][:]
+        lat = raster[y_var][:]
+    elif isinstance(raster, xr.DataArray):  # raster
+        return raster.transform
     else:
-        raise ValueError('Unconfigured filter type')
+        raise ValueError(f'Unsupported engine: {engine}')
+
+    if lat.ndim == 2:
+        lat = lat[:, 0]
+    if lon.ndim == 2:
+        lon = lon[0, :]
+
+    raster.close()
+    return affine.Affine(lon[1] - lon[0], 0, lon.min(), 0, lat[0] - lat[1], lat.max())

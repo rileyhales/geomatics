@@ -3,10 +3,9 @@ API Documentation
 *****************
 
 .. toctree::
-   :maxdepth: 3
+	:maxdepth: 3
 
-   convert
-   data
-   geotiffs
-   gribs
-   netcdfs
+	convert
+	data
+	inspect
+	times

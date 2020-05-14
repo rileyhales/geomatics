@@ -12,6 +12,14 @@ Sign up for an account on pypi.org
 	python setup.py sdist
 	twine upload dist/name_of_dist.tar.gz
 
+Useful to have a .pypirc file so that you aren't asked for log in every time
+
+.. code-block::
+
+	[pypi]
+	username = <your username>
+	password = <your password>
+
 Packaging for Conda/Anaconda Cloud
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Sign up for an account on anaconda.org
