@@ -14,5 +14,5 @@ GeoTIFF
 ~~~~~~~
 
 .. automodule:: geomatics.convert
-	:members: to_geotiff, upsample_geotiff
+	:members: to_gtiffs, to_mb_gtiff, upsample_gtiff
 	:noindex:

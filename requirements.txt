@@ -12,3 +12,4 @@ requests
 pyshp
 affine
 pillow
+geopandas

@@ -8,4 +8,4 @@ API Documentation
 	convert
 	data
 	inspect
-	times
+	timeseries

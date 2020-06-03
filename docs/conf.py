@@ -13,7 +13,7 @@ copyright = '2020, Riley Hales'
 author = 'Riley Hales'
 
 # The full version, including alpha/beta/rc tags
-release = '0.8'
+release = '0.9'
 master_doc = 'index'
 
 # -- General configuration ---------------------------------------------------
@@ -45,7 +45,9 @@ autodoc_mock_imports = [
     'pyproj',
     'xarray',
     'h5py',
-    'affine'
+    'affine',
+    'geopandas',
+    'PIL',
 ]
 
 # Add any paths that contain templates here, relative to this directory.

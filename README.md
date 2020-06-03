@@ -2,7 +2,7 @@
 
 Geospatial tools in pure python developed by Riley Hales as part of a Master's Thesis in Civil and Environmental Engineering at Brigham Young University.
 
-A GDAL-less set of tools for performing GIS operations on raster datasets in scientific file formats (netCDF, grib, pending h5) with vector geometries in common formats (geoJSON, shapefile). These formats are common in scientific modeling but not so readily processed and interpretted by common GIS softwares.
+A set of tools for performing GIS operations on raster datasets in scientific file formats (netCDF, grib, pending h5) with vector geometries in common formats (geoJSON, shapefile). These formats are common in scientific modeling but not so readily processed and interpretted by common GIS softwares.
 https://geomatics.readthedocs.io  
 https://github.com/conda-forge/geomatics-feedstock
 

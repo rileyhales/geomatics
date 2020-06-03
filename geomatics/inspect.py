@@ -2,7 +2,7 @@ import h5py
 import netCDF4 as nc
 import xarray as xr
 
-from ._utils import open_by_engine, array_by_engine
+from ._utils import _open_by_engine, _array_by_engine
 
 __all__ = ['netcdf', 'grib', 'hdf5', 'geotiff', 'georeferencing']
 
@@ -110,9 +110,9 @@ def georeferencing(file: str,
         A dictionary containing the information needed to create the affine transformation of a dataset.
     """
     # open the file to be read
-    ds = open_by_engine(file, engine, xr_kwargs)
-    x_data = array_by_engine(ds, x_var, h5_group)
-    y_data = array_by_engine(ds, y_var, h5_group)
+    ds = _open_by_engine(file, engine, xr_kwargs)
+    x_data = _array_by_engine(ds, x_var, h5_group)
+    y_data = _array_by_engine(ds, y_var, h5_group)
 
     return {
         'x_first_val': x_data[0],

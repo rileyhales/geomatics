@@ -4,12 +4,13 @@ import os
 
 import affine
 import h5py
+import netCDF4 as nc
 import requests
 import xarray as xr
 
-from ._utils import open_by_engine
+from ._utils import _open_by_engine
 
-__all__ = ['download_noaa_gfs', 'get_livingatlas_geojson', 'gen_affine']
+__all__ = ['download_noaa_gfs', 'get_livingatlas_geojson', 'gen_affine', 'gen_ncml']
 
 
 def download_noaa_gfs(save_path: str, steps: int) -> list:
@@ -158,7 +159,7 @@ def gen_affine(path: str,
     Returns:
         tuple(affine.Affine, width: int, height: int)
     """
-    raster = open_by_engine(path, engine, xr_kwargs)
+    raster = _open_by_engine(path, engine, xr_kwargs)
     if isinstance(raster, xr.Dataset):  # xarray
         lon = raster.variables[x_var][:]
         lat = raster.variables[y_var][:]
@@ -179,3 +180,48 @@ def gen_affine(path: str,
 
     raster.close()
     return affine.Affine(lon[1] - lon[0], 0, lon.min(), 0, lat[0] - lat[1], lat.max())
+
+
+# NCML tool
+def gen_ncml(files: list, save_dir: str, time_interval: int) -> None:
+    """
+    Generates a ncml file which aggregates a list of netcdf files across the "time" dimension and the "time" variable.
+    In order for the times displayed in the aggregated NCML dataset to be accurate, they must have a regular time step
+    between measurments.
+
+    Args:
+        files: A list of absolute paths to netcdf files (even if len==1)
+        save_dir: the directory where you would like to save the ncml
+        time_interval: the time spacing between datasets in the units of the netcdf file's time variable
+          (must be constont for ncml aggregation to work properly)
+
+    Returns:
+        pandas.DataFrame
+
+    Examples:
+        .. code-block:: python
+
+            data = geomatics.timedata.generate_timejoining_ncml('/path/to/netcdf/', '/path/to/save', 4)
+    """
+    ds = nc.Dataset(files[0])
+    units_str = str(ds['time'].__dict__['units'])
+    ds.close()
+
+    # create a new ncml file by filling in the template with the right dates and writing to a file
+    with open(os.path.join(save_dir, 'time_joined_series.ncml'), 'w') as ncml:
+        ncml.write(
+            '<netcdf xmlns="http://www.unidata.ucar.edu/namespaces/netcdf/ncml-2.2">\n' +
+            '  <variable name="time" type="int" shape="time">\n' +
+            '    <attribute name="units" value="' + units_str + '"/>\n' +
+            '    <attribute name="_CoordinateAxisType" value="Time" />\n' +
+            '    <values start="0" increment="' + str(time_interval) + '" />\n' +
+            '  </variable>\n' +
+            '  <aggregation dimName="time" type="joinExisting" recheckEvery="5 minutes">\n'
+        )
+        for file in files:
+            ncml.write('    <netcdf location="' + file + '"/>\n')
+        ncml.write(
+            '  </aggregation>\n' +
+            '</netcdf>'
+        )
+    return

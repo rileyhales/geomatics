@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = '0.8'
+version = '0.9'
 
 with open('README.md', 'r') as readme:
     long_description = readme.read()
@@ -12,7 +12,7 @@ setup(
     name='geomatics',
     packages=['geomatics'],
     version=version,
-    description='Geospatial tools for creating timeseries of from geospatial raster data in pure python.',
+    description='Geospatial tools for creating timeseries of from n-dimensional scientific data file formats',
     long_description=long_description,
     long_description_content_type="text/markdown",
     author='Riley Hales',

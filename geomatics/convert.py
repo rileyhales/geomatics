@@ -6,10 +6,10 @@ import rasterio
 import shapefile
 from rasterio.enums import Resampling
 
-from ._utils import open_by_engine, array_by_engine
+from ._utils import _open_by_engine, _array_by_engine
 from .data import gen_affine
 
-__all__ = ['geojson_to_shapefile', 'to_geotiff', 'upsample_geotiff']
+__all__ = ['geojson_to_shapefile', 'to_gtiffs', 'to_mb_gtiff', 'upsample_gtiff']
 
 
 def geojson_to_shapefile(geojson: dict, savepath: str) -> None:
@@ -59,18 +59,18 @@ def geojson_to_shapefile(geojson: dict, savepath: str) -> None:
     return
 
 
-def to_geotiff(files: list,
-               var: str,
-               engine: str = None,
-               aff: affine.Affine = None,
-               crs: str = 'EPSG:4326',
-               x_var: str = 'lon',
-               y_var: str = 'lat',
-               xr_kwargs: dict = None,
-               h5_group: str = None,
-               fill_value: int = -9999,
-               save_dir: str = False,
-               delete_sources: bool = False) -> list:
+def to_gtiffs(files: list,
+              var: str,
+              engine: str = None,
+              aff: affine.Affine = None,
+              crs: str = 'EPSG:4326',
+              x_var: str = 'lon',
+              y_var: str = 'lat',
+              xr_kwargs: dict = None,
+              h5_group: str = None,
+              fill_value: int = -9999,
+              save_dir: str = False,
+              delete_sources: bool = False) -> list:
     """
     Converts the array of data for a certain variable in a grib file to a geotiff.
 
@@ -109,14 +109,14 @@ def to_geotiff(files: list,
         output_files.append(save_path)
 
         # open the netcdf and get the data array
-        file_obj = open_by_engine(file, engine, xr_kwargs)
-        array = np.asarray(array_by_engine(file_obj, var=var, h5_group=h5_group))
+        file_obj = _open_by_engine(file, engine, xr_kwargs)
+        array = np.asarray(_array_by_engine(file_obj, var=var, h5_group=h5_group))
         array = np.squeeze(array)
         array[array == fill_value] = np.nan  # If you have fill values, change the comparator to git rid of it
         array = np.flip(array, axis=0)
         file_obj.close()
 
-        # if you want to delete the source netcdfs as you go
+        # if you want to delete the source files as you go
         if delete_sources:
             os.remove(file)
 
@@ -138,7 +138,99 @@ def to_geotiff(files: list,
     return output_files
 
 
-def upsample_geotiff(files: list, scale: float) -> list:
+def to_mb_gtiff(files: list,
+                var: str,
+                engine: str = None,
+                aff: affine.Affine = None,
+                crs: str = 'EPSG:4326',
+                x_var: str = 'lon',
+                y_var: str = 'lat',
+                xr_kwargs: dict = None,
+                h5_group: str = None,
+                fill_value: int = -9999,
+                save_dir: str = False,
+                save_name: str = False,
+                delete_sources: bool = False) -> list:
+    """
+    Converts the array of data for a certain variable in a grib file to a geotiff.
+
+    Args:
+        files: A list of absolute paths to the appropriate type of files (even if len==1)
+        var: The name of a variable as it is stored in the netcdf e.g. 'temp' instead of Temperature
+        engine: the python package used to power the file reading
+        aff: an affine.Affine transformation for the data if you already know what it is
+        crs: Coordinate Reference System used by rasterio.open(). An EPSG such as 'EPSG:4326' or '+proj=latlong'
+        x_var: Name of the x coordinate variable used to spatial reference the netcdf array. Default: 'lon'
+        y_var: Name of the y coordinate variable used to spatial reference the netcdf array. Default: 'lat'
+        h5_group: if all variables in the hdf5 file are in the same group, you can specify the name of the group here
+        xr_kwargs: A dictionary of kwargs that you might need when opening complex grib files with xarray
+        save_dir: The directory to store the geotiffs to. Default: directory containing the netcdfs.
+        save_name: The name of the output geotiff file including the '.tif' extension.
+        fill_value: The value used for filling no_data spaces in the array. Default: -9999
+        delete_sources: Allows you to delete the source netcdfs as they are converted. Default: False
+
+    Returns:
+        A list of paths to the geotiff files created
+    """
+    if isinstance(files, str):
+        files = [files, ]
+    if aff is None:
+        aff = gen_affine(files[0], x_var, y_var, engine=engine, xr_kwargs=xr_kwargs)
+
+    if not save_name:
+        save_name = 'multiband_collection.tif'
+    if not save_dir:
+        save_dir = os.path.join(os.path.dirname(files[0]), save_name)
+    if not os.path.exists(save_dir):
+        raise NotADirectoryError(f'Directory to save output file not found at path: {save_dir}')
+    save_path = os.path.join(save_dir, save_name)
+
+    # open the netcdf and get the data array
+    file_obj = _open_by_engine(files[0], engine, xr_kwargs)
+    array = np.squeeze(np.asarray(_array_by_engine(file_obj, var=var, h5_group=h5_group)))
+    array[array == fill_value] = np.nan  # If you have fill values, change the comparator to git rid of it
+    array = np.flip(array, axis=0)
+    file_obj.close()
+
+    # if you want to delete the source netcdfs as you go
+    if delete_sources:
+        os.remove(files[0])
+
+    # write it to a geotiff
+    with rasterio.open(
+            save_path,
+            'w',
+            driver='GTiff',
+            height=array.shape[0],
+            width=array.shape[1],
+            count=len(files),
+            dtype=array.dtype,
+            nodata=np.nan,
+            crs=crs,
+            transform=aff,
+    ) as dst:
+        # write the first array that we used to get the referencing information
+        dst.write(array, 1)
+        files.pop(0)
+
+        # now add the rest of the arrays for the remaining files
+        for i, file in enumerate(files):
+            file_obj = _open_by_engine(file, engine, xr_kwargs)
+            array = np.squeeze(np.asarray(_array_by_engine(file_obj, var=var, h5_group=h5_group)))
+            array[array == fill_value] = np.nan  # If you have fill values, change the comparator to git rid of it
+            array = np.flip(array, axis=0)
+            file_obj.close()
+
+            # if you want to delete the source files as you go
+            if delete_sources:
+                os.remove(file)
+
+            dst.write(array, i + 2)
+
+    return save_path
+
+
+def upsample_gtiff(files: list, scale: float) -> list:
     """
     Performs array math to artificially increase the resolution of a geotiff. No interpolation of values. A scale
     factor of X means that the length of a horizontal and vertical grid cell decreases by X. Be careful, increasing the
