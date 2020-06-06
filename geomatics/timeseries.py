@@ -338,9 +338,11 @@ def _slicing_info(path: str,
         raise ValueError(f'the variable "{var}" was not found in the file {path}')
 
     # if its a netcdf or grib, the dimensions should be included by xarray
-    if engine in ('xarray', 'cfgrib', 'netcdf4', 'rasterio'):
+    if engine in ('xarray', 'cfgrib', 'rasterio'):
         dim_order = list(tmp_file[var].dims)
-    elif engine == 'hdf5':
+    elif engine == 'netcdf4':
+        dim_order = list(tmp_file[var].dimensions)
+    elif engine == 'h5py':
         if h5_group is not None:
             tmp_file = tmp_file[h5_group]
         dim_order = [i.label for i in tmp_file[var].dims]
@@ -355,9 +357,8 @@ def _slicing_info(path: str,
         dim_order[i] = tmp
     dim_order = str.join(',', dim_order)
 
-    tmp_file.close()
-
     if min_coords is None and max_coords is None:
+        tmp_file.close()
         return dim_order, None
 
     if max_coords is None:
@@ -385,6 +386,7 @@ def _slicing_info(path: str,
             steps = _array_by_engine(tmp_file, dims[i])
             slices_dict[f'dim{i}'] = _find_nearest_slice_index(steps, min_coords[i], max_coords[i])
 
+    tmp_file.close()
     return dim_order, tuple([slices_dict[d] for d in dim_order.split(',')])
 
 
