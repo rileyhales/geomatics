@@ -31,8 +31,12 @@ def speed_test_optimization2():
     t3 = datetime.datetime.now()
     print((t2 - t1).total_seconds())
     print((t3 - t2).total_seconds())
+    return
 
 
 if __name__ == '__main__':
+    geomatics.timeseries.point(
+        ['/Users/rileyhales/Downloads/gfs_test_file_20001010.grb'], 1, (10, 10), ('longitudes', 'latitudes'),
+        engine='pygrib', strp='gfs_test_file_%Y%m%d.grb')
     speed_test_optimization1()
     speed_test_optimization2()

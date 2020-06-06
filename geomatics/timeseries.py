@@ -74,7 +74,8 @@ def point(files: list,
                 results['values'].append(v)
         else:
             raise ValueError('There are too many dimensions')
-        opened_file.close()
+        if engine != 'pygrib':
+            opened_file.close()
 
     # return the data stored in a dataframe
     return pd.DataFrame(results)
@@ -342,6 +343,8 @@ def _slicing_info(path: str,
         dim_order = list(tmp_file[var].dims)
     elif engine == 'netcdf4':
         dim_order = list(tmp_file[var].dimensions)
+    elif engine == 'pygrib':
+        dim_order = ['latitudes', 'longitudes']
     elif engine == 'h5py':
         if h5_group is not None:
             tmp_file = tmp_file[h5_group]
@@ -367,26 +370,32 @@ def _slicing_info(path: str,
     # gather all the indices
     slices_dict = dict(t_dim=slice(None))
 
-    # SLICING THE --X-- COORDINATE
-    steps = _array_by_engine(tmp_file, dims[0])
-    if steps.ndim == 2:
-        steps = steps[0, :]
-    slices_dict['dim0'] = _find_nearest_slice_index(steps, min_coords[0], max_coords[0])
-
-    # SLICING THE --Y-- COORDINATE
-    if len(min_coords) >= 2:
-        steps = _array_by_engine(tmp_file, dims[1])
+    if engine == 'pygrib':
+        slices_dict['dim0'] = _find_nearest_slice_index(
+            np.array(sorted(list(set(tmp_file[1].longitudes)))), min_coords[0], max_coords[0])
+        slices_dict['dim1'] = _find_nearest_slice_index(
+            np.array(sorted(list(set(tmp_file[1].latitudes)))), min_coords[0], max_coords[0])
+    else:
+        # SLICING THE --X-- COORDINATE
+        steps = _array_by_engine(tmp_file, dims[0])
         if steps.ndim == 2:
-            steps = steps[:, 0]
-        slices_dict['dim1'] = _find_nearest_slice_index(steps, min_coords[1], max_coords[1])
+            steps = steps[0, :]
+        slices_dict['dim0'] = _find_nearest_slice_index(steps, min_coords[0], max_coords[0])
 
-    # SLICING THE --Z-- AND OTHER ANY OTHER COORDINATES
-    if len(min_coords) >= 3:
-        for i in range(2, len(min_coords)):
-            steps = _array_by_engine(tmp_file, dims[i])
-            slices_dict[f'dim{i}'] = _find_nearest_slice_index(steps, min_coords[i], max_coords[i])
+        # SLICING THE --Y-- COORDINATE
+        if len(min_coords) >= 2:
+            steps = _array_by_engine(tmp_file, dims[1])
+            if steps.ndim == 2:
+                steps = steps[:, 0]
+            slices_dict['dim1'] = _find_nearest_slice_index(steps, min_coords[1], max_coords[1])
 
-    tmp_file.close()
+        # SLICING THE --Z-- AND OTHER ANY OTHER COORDINATES
+        if len(min_coords) >= 3:
+            for i in range(2, len(min_coords)):
+                steps = _array_by_engine(tmp_file, dims[i])
+                slices_dict[f'dim{i}'] = _find_nearest_slice_index(steps, min_coords[i], max_coords[i])
+
+        tmp_file.close()
     return dim_order, tuple([slices_dict[d] for d in dim_order.split(',')])
 
 
@@ -402,7 +411,7 @@ def _gen_stat_list(stats: str or list):
 
 def _handle_time_steps(opened_file, file_path, t_dim, strp_string, h5_group):
     if strp_string:
-        return datetime.datetime.strptime(file_path, strp_string)
+        return [datetime.datetime.strptime(os.path.basename(file_path), strp_string), ]
     else:  # use the time variable
         ts = _array_by_engine(opened_file, t_dim, h5_group=h5_group)
         if ts.ndim == 0:

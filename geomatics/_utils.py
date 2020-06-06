@@ -1,6 +1,7 @@
 import h5py
 import netCDF4 as nc
 import numpy as np
+import pygrib
 import xarray as xr
 from PIL import TiffImagePlugin, Image
 
@@ -18,6 +19,9 @@ def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None) 
         return nc.Dataset(path, 'r')
     elif engine == 'cfgrib':
         return xr.open_dataset(path, engine='cfgrib', backend_kwargs=backend_kwargs)
+    elif engine == 'pygrib':
+        a = pygrib.open(path)
+        return a.read()
     elif engine == 'h5py':
         return h5py.File(path, 'r')
     elif engine in ('PIL', 'pillow'):
@@ -33,6 +37,8 @@ def _array_by_engine(open_file, var: str, h5_group: str = None):
         return open_file[var].data
     elif isinstance(open_file, nc.Dataset):  # netcdf4
         return open_file[var][:]
+    elif isinstance(open_file, list):  # pygrib
+        return open_file[var].values
     elif isinstance(open_file, h5py.File) or isinstance(open_file, h5py.Dataset):  # h5py
         if h5_group is not None:
             open_file = open_file[h5_group]
@@ -59,6 +65,8 @@ def _pick_engine(path: str) -> str:
 def _check_var_in_dataset(open_file, variable, h5_group):
     if isinstance(open_file, xr.Dataset) or isinstance(open_file, nc.Dataset):  # xarray, netcdf4
         return bool(variable in open_file.variables)
+    elif isinstance(open_file, list):  # pygrib comes as lists of messages
+        return bool(variable <= len(open_file))  # todo check this more
     elif isinstance(open_file, h5py.File) or isinstance(open_file, h5py.Dataset):  # h5py
         if h5_group is not None:
             open_file = open_file[h5_group]
