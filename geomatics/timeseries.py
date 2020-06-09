@@ -16,7 +16,7 @@ ALL_STATS = ('mean', 'median', 'max', 'min', 'sum', 'std')
 
 
 def point(files: list,
-          var: str,
+          var: str or int,
           coords: tuple,
           dims: tuple = None,
           t_dim: str = 'time',
@@ -30,7 +30,8 @@ def point(files: list,
 
     Args:
         files: A list of absolute paths to netcdf, grib, or hdf5 files (even if len==1)
-        var: The name of a variable as it is stored in the file e.g. often 'temp' or 'T' instead of Temperature
+        var: The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of Temperature) or the
+            band number if you are using grib files and you specify the engine as pygrib
         coords: A tuple of the coordinates for the location of interest in the order (x, y, z)
         dims: A tuple of the names of the (x, y, z) variables in the data files, the same you specified coords for.
             Defaults to common x, y, z variables names: ('lon', 'lat', 'depth')
@@ -82,7 +83,7 @@ def point(files: list,
 
 
 def bounding_box(files: list,
-                 var: str,
+                 var: str or int,
                  min_coords: tuple,
                  max_coords: tuple,
                  dims: tuple = None,
@@ -98,7 +99,8 @@ def bounding_box(files: list,
 
     Args:
         files: A list of absolute paths to netcdf or gribs files (even if len==1)
-        var: The name of a variable as it is stored in the file e.g. often 'temp' or 'T' instead of Temperature
+        var: The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of Temperature) or the
+            band number if you are using grib files and you specify the engine as pygrib
         min_coords: A tuple of the minimum coordinates for the region of interest in the order (x, y, z)
         max_coords: A tuple of the maximum coordinates for the region of interest in the order (x, y, z)
         dims: A tuple of the names of the (x, y, z) variables in the data files, the same you specified coords for.
@@ -153,7 +155,7 @@ def bounding_box(files: list,
 
 
 def polygons(files: list,
-             var: str,
+             var: str or int,
              poly: str or dict,
              dims: tuple = None,
              t_dim: str = 'time',
@@ -169,7 +171,8 @@ def polygons(files: list,
 
     Args:
         files: A list of absolute paths to netcdf or gribs files (even if len==1)
-        var: The name of a variable as it is stored in the file e.g. often 'temp' or 'T' instead of Temperature
+        var: The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of Temperature) or the
+            band number if you are using grib files and you specify the engine as pygrib
         poly: the path to a shapefile or geojson in the same coordinate system and projection as the raster data
         dims: A tuple of the names of the (x, y, z) variables in the data files, the same you specified coords for.
             Defaults to common x, y, z variables names: ('lon', 'lat', 'depth')
@@ -263,7 +266,7 @@ def polygons(files: list,
 
 
 def full_array_stats(files: list,
-                     var: str,
+                     var: str or int,
                      t_dim: str = 'time',
                      strp: str = False,
                      stats: str or list = 'mean',
@@ -276,7 +279,8 @@ def full_array_stats(files: list,
 
     Args:
         files: A list of absolute paths to netcdf or gribs files (even if len==1)
-        var: The name of a variable as it is stored in the file e.g. often 'temp' or 'T' instead of Temperature
+        var: The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of Temperature) or the
+            band number if you are using grib files and you specify the engine as pygrib
         t_dim: Name of the time variable if it is used in the files. Default: 'time'
         strp: A string compatible with datetime.strptime for extracting datetime pattern in file names
         stats: How to reduce the array into a single value for the timeseries.

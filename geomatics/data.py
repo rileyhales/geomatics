@@ -7,10 +7,11 @@ import h5py
 import netCDF4 as nc
 import requests
 import xarray as xr
+from dateutil.relativedelta import relativedelta
 
 from ._utils import _open_by_engine
 
-__all__ = ['download_noaa_gfs', 'get_livingatlas_geojson', 'gen_affine', 'gen_ncml']
+__all__ = ['download_noaa_gfs', 'download_nasa_gldas', 'get_livingatlas_geojson', 'gen_affine', 'gen_ncml']
 
 
 def download_noaa_gfs(save_path: str, steps: int) -> list:
@@ -70,6 +71,50 @@ def download_noaa_gfs(save_path: str, steps: int) -> list:
                 for chunk in r.iter_content(chunk_size=10240):
                     if chunk:
                         f.write(chunk)
+    return downloaded_files
+
+
+def download_nasa_gldas(save_path: str, start: datetime.date, end: datetime.date, chunk_size: int = 10240) -> list:
+    """
+    Downloads NASA GLDAS monthly files between a provided start and end date.
+
+    *Only works if you already have the prerequisite .netrc file with your username and password already
+    configured on your machine.
+
+    *This is not a recommended way to download NASA products. This works fine for retrieving a few sample files. For
+    a better solution, refer to NASA's GESDISC documentation. This is included for convenience in gathering sample data.
+
+    Most GLDAS files are about 25Mb/file
+
+    Args:
+        save_path: The path to a directory where you want the data saved
+        start: a datetime.date representing the first month for which you want data. No earlier than Jan 1948.
+        end: a datetime.date representing the last month for which you want data. Up to the current previous month.
+        chunk_size: Files are streamed and written in chunks, default chunk size to write is 10240.
+
+    Returns:
+        List of absolute paths to the files that were downloaded
+    """
+    base = 'https://hydro1.gesdisc.eosdis.nasa.gov/data/GLDAS'
+    downloaded_files = []
+    while start <= end:
+        if start.year < 2000:
+            model = 'GLDAS_NOAH025_M.2.0'
+            tail = '020'
+        else:
+            model = 'GLDAS_NOAH025_M.2.1'
+            tail = '021'
+        filename = f'GLDAS_NOAH025_M.A{start.year}{start.month}.{tail}.nc4'
+
+        with requests.get(f'{base}/{model}/{start.year}/{filename}', stream=True) as r:
+            r.raise_for_status()
+            new_file = os.path.join(save_path, filename)
+            downloaded_files.append(new_file)
+            with open(new_file, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        f.write(chunk)
+        start += relativedelta(months=1)
     return downloaded_files
 
 

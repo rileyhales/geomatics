@@ -12,7 +12,7 @@ probably get an error message that looks something like this:
 
 .. code-block:: shell
 
-	cfgrib.dataset.DatasetBuildError: multiple values for unique key, try re-open the file with one of:
+    cfgrib.dataset.DatasetBuildError: multiple values for unique key, try re-open the file with one of:
         filter_by_keys={'cfVarName': 'vis', 'typeOfLevel': 'surface'}
 
 It wants you to provide a dictionary of additional filters used to open a subset of the complicated file. Specifically,
@@ -20,17 +20,17 @@ it wants you to use ``filter_by_keys`` as one of the dictionary keys.
 
 .. code-block:: python
 
-	# Usually this is enough
-	{'filter_by_keys': {'cfVarName': <name of your variable>}}
-	# Sometimes you also need to specify the variable's level, another of the coordinate variables/dimensions
-	{'filter_by_keys': {'cfVarName': <name of your variable>, 'typeOfLevel': <variables level>}}
+    # Usually this is enough
+    {'filter_by_keys': {'cfVarName': <name of your variable>}}
+    # Sometimes you also need to specify the variable's level, another of the coordinate variables/dimensions
+    {'filter_by_keys': {'cfVarName': <name of your variable>, 'typeOfLevel': <variables level>}}
 
 You can specify this in geomatics by using the optional ``xr_kwargs`` argument
 
 .. code-block:: python
     :emphasize-lines: 5
 
-	point_series(files,
+    point_series(files,
                  var,
                  coords,
                  ... (other parameters),

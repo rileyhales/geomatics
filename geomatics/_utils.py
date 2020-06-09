@@ -32,7 +32,7 @@ def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None) 
         raise ValueError(f'Unable to open file, unsupported engine: {engine}')
 
 
-def _array_by_engine(open_file, var: str, h5_group: str = None):
+def _array_by_engine(open_file, var: str or int, h5_group: str = None):
     if isinstance(open_file, xr.Dataset):  # xarray, cfgrib, rasterio
         return open_file[var].data
     elif isinstance(open_file, nc.Dataset):  # netcdf4
@@ -62,15 +62,15 @@ def _pick_engine(path: str) -> str:
         raise ValueError(f'File path does not match known files extensions, engine could not be guessed: {path}')
 
 
-def _check_var_in_dataset(open_file, variable, h5_group):
+def _check_var_in_dataset(open_file, var, h5_group):
     if isinstance(open_file, xr.Dataset) or isinstance(open_file, nc.Dataset):  # xarray, netcdf4
-        return bool(variable in open_file.variables)
+        return bool(var in open_file.variables)
     elif isinstance(open_file, list):  # pygrib comes as lists of messages
-        return bool(variable <= len(open_file))  # todo check this more
+        return bool(var <= len(open_file))
     elif isinstance(open_file, h5py.File) or isinstance(open_file, h5py.Dataset):  # h5py
         if h5_group is not None:
             open_file = open_file[h5_group]
-        return bool(variable in open_file.keys())
+        return bool(var in open_file.keys())
     elif isinstance(open_file, TiffImagePlugin.TiffImageFile):  # geotiff
         return False
     else:

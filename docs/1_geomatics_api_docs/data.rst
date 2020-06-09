@@ -8,7 +8,7 @@ Download Tools
 ~~~~~~~~~~~~~~
 
 .. automodule:: geomatics.data
-	:members: download_noaa_gfs, get_livingatlas_geojson
+	:members: download_noaa_gfs, download_nasa_gldas, get_livingatlas_geojson
 
 Georeferencing
 ~~~~~~~~~~~~~~
