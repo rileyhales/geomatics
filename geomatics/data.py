@@ -205,7 +205,7 @@ def gen_affine(path: str,
         tuple(affine.Affine, width: int, height: int)
     """
     raster = _open_by_engine(path, engine, xr_kwargs)
-    if isinstance(raster, xr.Dataset):  # xarray
+    if isinstance(raster, xr.Dataset) or isinstance(raster, nc.Dataset):  # xarray
         lon = raster.variables[x_var][:]
         lat = raster.variables[y_var][:]
     elif isinstance(raster, h5py.Dataset):  # h5py
