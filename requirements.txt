@@ -11,5 +11,4 @@ pandas>=1
 requests
 pyshp
 affine
-pillow
 geopandas

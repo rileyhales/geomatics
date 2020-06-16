@@ -26,38 +26,54 @@ def test_engine(files: list, var: str or int, coords: tuple, min_coords, max_coo
     return (t2 - t1).total_seconds(), (t3 - t2).total_seconds(), (t4 - t3).total_seconds(), (t5 - t4).total_seconds()
 
 
-def make_bar_chart(df: pd.DataFrame or str):
+def make_bar_chart(df: pd.DataFrame or str, name_of_plot: str = 'Average Execution Times',
+                   name_of_file: str = 'results_bar_plot.svg'):
     if isinstance(df, str):
-        df = pd.read_csv(df)
+        avg = pd.read_csv(df)
+    else:
+        avg = df.copy()
+    columns = avg.columns
+    avg = avg.mean(axis=0)
     x = ['Point Series', 'Bounding Box Series', 'Polygon Series', 'Full Array Series']
-    df = df.mean(axis=0)
     layout = go.Layout(
-        title='Average Execution Times',
+        title=name_of_plot,
         yaxis={'title': 'Time (seconds)'},
         xaxis={'title': 'Series Type'},
         barmode='group',
     )
+    eng1 = columns[0].split('_')[0]
+    eng2 = columns[-1].split('_')[0]
     fig = go.Figure(data=[
-        go.Bar(name='netCDF4 Engine', x=x, y=df.values[:4]),
-        go.Bar(name='xarray Engine', x=x, y=df.values[4:])
+        go.Bar(name=f'{eng1} Engine', x=x, y=avg.values[:4]),
+        go.Bar(name=f'{eng2} Engine', x=x, y=avg.values[4:])
     ], layout=layout)
-    fig.write_image('netcdf_plot.svg')
+    fig.write_image(name_of_file)
     return
+
+
+def make_stats_bar_chart(df: pd.DataFrame or str, name_of_file: str = 'results_stats_bar_plot.svg'):
+    if isinstance(df, str):
+        stats = pd.read_csv(df)
+    else:
+        stats = df.copy()
+    print(stats)
+    print(stats.index)
+    stats = stats[stats.index == 'Mean/File']
+    return make_bar_chart(stats, 'Average Execution Time Per File', name_of_file)
 
 
 def compute_stats(df: pd.DataFrame or str, round_decimals_to: int = 3):
     if isinstance(df, str):
-        df = pd.read_csv(df)
-    stats = pd.DataFrame([df.max(axis=0), df.mean(axis=0), df.median(axis=0), df.min(axis=0), df.std(axis=0)],
+        df1 = pd.read_csv(df)
+    else:
+        df1 = df.copy()
+    stats = pd.DataFrame([df1.max(axis=0), df1.mean(axis=0), df1.median(axis=0), df1.min(axis=0), df1.std(axis=0)],
                          index=['Max', 'Mean', 'Median', 'Min', 'St. Dev.'])
-
-    per_file = pd.DataFrame(stats.values / len(df.index), columns=stats.columns,
+    per_file = pd.DataFrame(stats.values / len(df1.index), columns=stats.columns,
                             index=['Max/File', 'Mean/File', 'Median/File', 'Min/File', 'St. Dev./File'])
     per_file.drop('St. Dev./File', inplace=True)
-
     stats = stats.append(per_file)
     stats = stats.round(round_decimals_to)
-
     return stats
 
 

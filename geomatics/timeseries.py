@@ -196,8 +196,6 @@ def polygons(files: list,
     """
     if engine is None:
         engine = _pick_engine(files[0])
-    if engine == 'rasterio':
-        dims = ('x', 'y', 'band')
 
     # interpret the choice of statistics provided
     stats = _gen_stat_list(stats)
@@ -345,16 +343,24 @@ def _slicing_info(path: str,
         raise ValueError(f'the variable "{var}" was not found in the file {path}')
 
     # if its a netcdf or grib, the dimensions should be included by xarray
-    if engine in ('xarray', 'cfgrib', 'rasterio'):
+    if engine in ('xarray', 'cfgrib'):
         dim_order = list(tmp_file[var].dims)
     elif engine == 'netcdf4':
         dim_order = list(tmp_file[var].dimensions)
     elif engine == 'pygrib':
-        dim_order = ['latitudes', 'longitudes']
+        dim_order = ('latitudes', 'longitudes')
     elif engine == 'h5py':
         if h5_group is not None:
             tmp_file = tmp_file[h5_group]
         dim_order = [i.label for i in tmp_file[var].dims]
+    elif engine == 'rasterio':
+        dims = ['x', 'y', 'band']
+        dim_order = list(tmp_file.dims)
+        if min_coords is not None:
+            if len(min_coords) == 2:
+                min_coords = tuple(list(min_coords) + [1])
+                if max_coords is not None:
+                    max_coords = tuple(list(max_coords) + [1])
     else:
         raise ValueError(f'Unable to determine dims for engine: {engine}')
 
@@ -379,9 +385,9 @@ def _slicing_info(path: str,
 
     if engine == 'pygrib':
         slices_dict['dim0'] = _find_nearest_slice_index(
-            np.array(sorted(list(set(tmp_file[1].longitudes)))), min_coords[0], max_coords[0])
+            np.array(sorted(list(set(tmp_file[1].distinctLongitudes)))), min_coords[0], max_coords[0])
         slices_dict['dim1'] = _find_nearest_slice_index(
-            np.array(sorted(list(set(tmp_file[1].latitudes)))), min_coords[0], max_coords[0])
+            np.array(sorted(list(set(tmp_file[1].distinctLatitudes)))), min_coords[0], max_coords[0])
     else:
         # SLICING THE --X-- COORDINATE
         steps = _array_by_engine(tmp_file, dims[0])

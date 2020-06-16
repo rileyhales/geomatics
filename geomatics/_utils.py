@@ -3,7 +3,6 @@ import netCDF4 as nc
 import numpy as np
 import pygrib
 import xarray as xr
-from PIL import TiffImagePlugin, Image
 
 __all__ = ['_open_by_engine', '_array_by_engine', '_pick_engine', '_check_var_in_dataset', '_array_to_stat_list']
 
@@ -29,8 +28,6 @@ def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None) 
         return a.read()
     elif engine == 'h5py':
         return h5py.File(path, 'r')
-    elif engine in ('PIL', 'pillow'):
-        return Image.open(path, 'r')
     elif engine == 'rasterio':
         return xr.open_rasterio(path)
     else:
@@ -38,7 +35,11 @@ def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None) 
 
 
 def _array_by_engine(open_file, var: str or int, h5_group: str = None):
-    if isinstance(open_file, xr.Dataset):  # xarray, cfgrib, rasterio
+    if isinstance(open_file, xr.Dataset):  # xarray, cfgrib
+        return open_file[var].data
+    elif isinstance(open_file, xr.DataArray):  # rasterio
+        if isinstance(var, int):
+            return open_file.data
         return open_file[var].data
     elif isinstance(open_file, nc.Dataset):  # netcdf4
         return open_file[var][:]
@@ -48,8 +49,6 @@ def _array_by_engine(open_file, var: str or int, h5_group: str = None):
         if h5_group is not None:
             open_file = open_file[h5_group]
         return open_file[var][:]  # might need to use [...] for string data
-    elif isinstance(open_file, TiffImagePlugin.TiffImageFile):  # geotiff
-        return np.array(open_file)
     else:
         raise ValueError(f'Unrecognized opened file dataset: {type(open_file)}')
 
@@ -76,8 +75,8 @@ def _check_var_in_dataset(open_file, var, h5_group):
         if h5_group is not None:
             open_file = open_file[h5_group]
         return bool(var in open_file.keys())
-    elif isinstance(open_file, TiffImagePlugin.TiffImageFile):  # geotiff
-        return False
+    elif isinstance(open_file, xr.DataArray):
+        return bool(var <= open_file.band.shape[0])
     else:
         raise ValueError(f'Unrecognized opened file dataset: {type(open_file)}')
 

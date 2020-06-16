@@ -51,3 +51,4 @@ if __name__ == '__main__':
     tests.speed_tests.make_bar_chart(df)
     stats_df = tests.speed_tests.compute_stats(df)
     stats_df.to_csv('grib_stats.csv')
+    tests.speed_tests.make_stats_bar_chart(stats_df)
