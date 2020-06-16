@@ -56,8 +56,6 @@ def make_stats_bar_chart(df: pd.DataFrame or str, name_of_file: str = 'results_s
         stats = pd.read_csv(df)
     else:
         stats = df.copy()
-    print(stats)
-    print(stats.index)
     stats = stats[stats.index == 'Mean/File']
     return make_bar_chart(stats, 'Average Execution Time Per File', name_of_file)
 

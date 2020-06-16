@@ -26,7 +26,7 @@ if __name__ == '__main__':
         ply_times = []
         fll_times = []
         for i in range(50):
-            pt, bx, ply, fll = tests.speed_tests.test_engine(
+            pt, bx, ply, fll = tests.speed.test_engine(
                 files, var, coords, min_coords, max_coords, dims, engine, filepath)
             pt_times.append(pt)
             box_times.append(bx)
@@ -39,7 +39,7 @@ if __name__ == '__main__':
         data[f'{engine}_full'] = fll_times
     df = pd.DataFrame(data).to_csv('netcdf_test_results.csv', index=False)
 
-    tests.speed_tests.make_bar_chart(df)
-    stats_df = tests.speed_tests.compute_stats(df)
+    tests.speed.make_bar_chart(df)
+    stats_df = tests.speed.compute_stats(df)
     stats_df.to_csv('netcdf_stats.csv')
-    tests.speed_tests.make_stats_bar_chart(stats_df)
+    tests.speed.make_stats_bar_chart(stats_df)

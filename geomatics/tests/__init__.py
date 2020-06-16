@@ -1,1 +1,1 @@
-import geomatics.tests.speed_tests
+import geomatics.tests.speed
