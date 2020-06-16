@@ -148,8 +148,8 @@ def bounding_box(files: list,
         vs[vs == fill_value] = np.nan
         for stat in stats:
             results[stat] += _array_to_stat_list(vs, stat)
-        opened_file.close()
-
+        if engine != 'pygrib':
+            opened_file.close()
     # return the data stored in a dataframe
     return pd.DataFrame(results)
 
@@ -259,7 +259,8 @@ def polygons(files: list,
             slice_2d = np.where(np.isnan(mask), np.nan, slice_2d * mask).squeeze()
             for stat in stats:
                 results[stat] += _array_to_stat_list(slice_2d, stat)
-        opened_file.close()
+        if engine != 'pygrib':
+            opened_file.close()
 
     # return the data stored in a dataframe
     return pd.DataFrame(results)
@@ -317,7 +318,8 @@ def full_array_stats(files: list,
         vs[vs == fill_value] = np.nan
         for stat in stats:
             results[stat] += _array_to_stat_list(vs, stat)
-        opened_file.close()
+        if engine != 'pygrib':
+            opened_file.close()
 
     # return the data stored in a dataframe
     return pd.DataFrame(results)
@@ -365,7 +367,8 @@ def _slicing_info(path: str,
     dim_order = str.join(',', dim_order)
 
     if min_coords is None and max_coords is None:
-        tmp_file.close()
+        if engine != 'pygrib':
+            tmp_file.close()
         return dim_order, None
 
     if max_coords is None:
@@ -399,7 +402,8 @@ def _slicing_info(path: str,
                 steps = _array_by_engine(tmp_file, dims[i])
                 slices_dict[f'dim{i}'] = _find_nearest_slice_index(steps, min_coords[i], max_coords[i])
 
-        tmp_file.close()
+        if engine != 'pygrib':
+            tmp_file.close()
     return dim_order, tuple([slices_dict[d] for d in dim_order.split(',')])
 
 
@@ -418,6 +422,8 @@ def _handle_time_steps(opened_file, file_path, t_dim, strp_string, h5_group):
         return [datetime.datetime.strptime(os.path.basename(file_path), strp_string), ]
     else:  # use the time variable
         ts = _array_by_engine(opened_file, t_dim, h5_group=h5_group)
+        if isinstance(ts, np.datetime64):
+            return [ts]
         if ts.ndim == 0:
             return ts
         else:

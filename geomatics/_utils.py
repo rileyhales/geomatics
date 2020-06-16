@@ -7,6 +7,11 @@ from PIL import TiffImagePlugin, Image
 
 __all__ = ['_open_by_engine', '_array_by_engine', '_pick_engine', '_check_var_in_dataset', '_array_to_stat_list']
 
+NETCDF_EXTENSIONS = ('.nc', '.nc4')
+GRIB_EXTENSIONS = ('.grb', '.grib', '.grib2')
+HDF_EXTENSIONS = ('.h5', '.hd5', '.hdf5')
+GEOTIFF_EXTENSIONS = ('.gtiff', '.tiff', 'tif')
+
 
 def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None) -> np.array:
     if engine is None:
@@ -50,16 +55,16 @@ def _array_by_engine(open_file, var: str or int, h5_group: str = None):
 
 
 def _pick_engine(path: str) -> str:
-    if path.endswith('.nc') or path.endswith('.nc4'):
+    if any(path.endswith(i) for i in NETCDF_EXTENSIONS):
         return 'netcdf4'
-    elif path.endswith('.grb') or path.endswith('.grib'):
+    if any(path.endswith(i) for i in GRIB_EXTENSIONS):
         return 'cfgrib'
-    elif path.endswith('.gtiff') or path.endswith('.tiff') or path.endswith('tif'):
-        return 'rasterio'
-    elif path.endswith('.h5') or path.endswith('.hd5') or path.endswith('.hdf5'):
+    elif any(path.endswith(i) for i in HDF_EXTENSIONS):
         return 'h5py'
+    if any(path.endswith(i) for i in GEOTIFF_EXTENSIONS):
+        return 'rasterio'
     else:
-        raise ValueError(f'File path does not match known files extensions, engine could not be guessed: {path}')
+        raise ValueError(f'File name does not match known files extensions, engine could not be guessed: {path}')
 
 
 def _check_var_in_dataset(open_file, var, h5_group):

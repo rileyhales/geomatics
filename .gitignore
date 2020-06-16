@@ -8,4 +8,6 @@ dev.ipynb
 geomatics.egg-info
 dist
 .pypirc
-test_data
+publication_data/netcdf_data
+publication_data/grib_data
+publication_data/geotiff_data
