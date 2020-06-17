@@ -348,7 +348,7 @@ def _slicing_info(path: str,
     elif engine == 'netcdf4':
         dim_order = list(tmp_file[var].dimensions)
     elif engine == 'pygrib':
-        dim_order = ('latitudes', 'longitudes')
+        dim_order = ['latitudes', 'longitudes']
     elif engine == 'h5py':
         if h5_group is not None:
             tmp_file = tmp_file[h5_group]
@@ -385,9 +385,9 @@ def _slicing_info(path: str,
 
     if engine == 'pygrib':
         slices_dict['dim0'] = _find_nearest_slice_index(
-            np.array(sorted(list(set(tmp_file[1].distinctLongitudes)))), min_coords[0], max_coords[0])
+            np.array(sorted(list(tmp_file[1].distinctLongitudes))), min_coords[0], max_coords[0])
         slices_dict['dim1'] = _find_nearest_slice_index(
-            np.array(sorted(list(set(tmp_file[1].distinctLatitudes)))), min_coords[0], max_coords[0])
+            np.array(sorted(list(tmp_file[1].distinctLatitudes))), min_coords[0], max_coords[0])
     else:
         # SLICING THE --X-- COORDINATE
         steps = _array_by_engine(tmp_file, dims[0])

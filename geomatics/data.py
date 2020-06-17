@@ -139,7 +139,7 @@ def download_nasa_gldas(save_path: str, start: datetime.date, end: datetime.date
     return downloaded_files
 
 
-def get_livingatlas_geojson(location: str) -> dict:
+def get_livingatlas_geojson(location: str = None) -> dict:
     """
     Requests a geojson from the ESRI living atlas services for World Regions or Generalized Country Boundaries
 
@@ -193,7 +193,13 @@ def get_livingatlas_geojson(location: str) -> dict:
 
     # get the geojson data from esri
     base = 'https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/'
-    if location in regions:
+
+    if location is None:
+        print('Choose a Country or World Region')
+        print(countries)
+        print(regions)
+        return
+    elif location in regions:
         url = base + 'World_Regions/FeatureServer/0/query?f=pgeojson&outSR=4326&where=REGION+%3D+%27' + location + '%27'
     elif location in countries:
         url = base + f'World__Countries_Generalized_analysis_trim/FeatureServer/0/query?' \

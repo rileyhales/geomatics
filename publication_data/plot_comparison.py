@@ -6,7 +6,7 @@ columns = df.columns
 df = df[df.index == 'Mean/File']
 x = ['Point Series', 'Bounding Box Series', 'Polygon Series', 'Full Array Series']
 layout = go.Layout(
-    title='Comparison of Engine Speeds Per File',
+    title='Time Series Extraction Time Per File',
     yaxis={'title': 'Time (seconds)'},
     xaxis={'title': 'Series Type'},
     barmode='group',
@@ -18,4 +18,4 @@ for i in range(engs):
     bars.append(go.Bar(name=f'{eng} Engine', x=x, y=df.values[0][4*i:4*(i+1)]))
 
 fig = go.Figure(data=bars, layout=layout)
-fig.write_image('total_comparison.png')
+fig.write_image('total_comparison.svg')
