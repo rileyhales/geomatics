@@ -195,10 +195,7 @@ def get_livingatlas_geojson(location: str = None) -> dict:
     base = 'https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/'
 
     if location is None:
-        print('Choose a Country or World Region')
-        print(countries)
-        print(regions)
-        return
+        return {'countries': countries, 'regions': regions}
     elif location in regions:
         url = base + 'World_Regions/FeatureServer/0/query?f=pgeojson&outSR=4326&where=REGION+%3D+%27' + location + '%27'
     elif location in countries:
