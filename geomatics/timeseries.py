@@ -13,10 +13,11 @@ from .data import gen_affine
 
 __all__ = ['point', 'bounding_box', 'polygons', 'full_array_stats']
 ALL_STATS = ('mean', 'median', 'max', 'min', 'sum', 'std')
+ALL_ENGINES = ('xarray', 'netcdf4', 'cfgrib', 'pygrib', 'h5py', 'rasterio')
 
 
 def point(files: list,
-          var: str,
+          var: str or int,
           coords: tuple,
           dims: tuple = None,
           t_dim: str = 'time',
@@ -30,7 +31,8 @@ def point(files: list,
 
     Args:
         files: A list of absolute paths to netcdf, grib, or hdf5 files (even if len==1)
-        var: The name of a variable as it is stored in the file e.g. often 'temp' or 'T' instead of Temperature
+        var: The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of Temperature) or the
+            band number if you are using grib files and you specify the engine as pygrib
         coords: A tuple of the coordinates for the location of interest in the order (x, y, z)
         dims: A tuple of the names of the (x, y, z) variables in the data files, the same you specified coords for.
             Defaults to common x, y, z variables names: ('lon', 'lat', 'depth')
@@ -74,14 +76,15 @@ def point(files: list,
                 results['values'].append(v)
         else:
             raise ValueError('There are too many dimensions')
-        opened_file.close()
+        if engine != 'pygrib':
+            opened_file.close()
 
     # return the data stored in a dataframe
     return pd.DataFrame(results)
 
 
 def bounding_box(files: list,
-                 var: str,
+                 var: str or int,
                  min_coords: tuple,
                  max_coords: tuple,
                  dims: tuple = None,
@@ -97,7 +100,8 @@ def bounding_box(files: list,
 
     Args:
         files: A list of absolute paths to netcdf or gribs files (even if len==1)
-        var: The name of a variable as it is stored in the file e.g. often 'temp' or 'T' instead of Temperature
+        var: The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of Temperature) or the
+            band number if you are using grib files and you specify the engine as pygrib
         min_coords: A tuple of the minimum coordinates for the region of interest in the order (x, y, z)
         max_coords: A tuple of the maximum coordinates for the region of interest in the order (x, y, z)
         dims: A tuple of the names of the (x, y, z) variables in the data files, the same you specified coords for.
@@ -145,14 +149,14 @@ def bounding_box(files: list,
         vs[vs == fill_value] = np.nan
         for stat in stats:
             results[stat] += _array_to_stat_list(vs, stat)
-        opened_file.close()
-
+        if engine != 'pygrib':
+            opened_file.close()
     # return the data stored in a dataframe
     return pd.DataFrame(results)
 
 
 def polygons(files: list,
-             var: str,
+             var: str or int,
              poly: str or dict,
              dims: tuple = None,
              t_dim: str = 'time',
@@ -168,7 +172,8 @@ def polygons(files: list,
 
     Args:
         files: A list of absolute paths to netcdf or gribs files (even if len==1)
-        var: The name of a variable as it is stored in the file e.g. often 'temp' or 'T' instead of Temperature
+        var: The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of Temperature) or the
+            band number if you are using grib files and you specify the engine as pygrib
         poly: the path to a shapefile or geojson in the same coordinate system and projection as the raster data
         dims: A tuple of the names of the (x, y, z) variables in the data files, the same you specified coords for.
             Defaults to common x, y, z variables names: ('lon', 'lat', 'depth')
@@ -192,8 +197,6 @@ def polygons(files: list,
     """
     if engine is None:
         engine = _pick_engine(files[0])
-    if engine == 'rasterio':
-        dims = ('x', 'y', 'band')
 
     # interpret the choice of statistics provided
     stats = _gen_stat_list(stats)
@@ -255,14 +258,15 @@ def polygons(files: list,
             slice_2d = np.where(np.isnan(mask), np.nan, slice_2d * mask).squeeze()
             for stat in stats:
                 results[stat] += _array_to_stat_list(slice_2d, stat)
-        opened_file.close()
+        if engine != 'pygrib':
+            opened_file.close()
 
     # return the data stored in a dataframe
     return pd.DataFrame(results)
 
 
 def full_array_stats(files: list,
-                     var: str,
+                     var: str or int,
                      t_dim: str = 'time',
                      strp: str = False,
                      stats: str or list = 'mean',
@@ -275,7 +279,8 @@ def full_array_stats(files: list,
 
     Args:
         files: A list of absolute paths to netcdf or gribs files (even if len==1)
-        var: The name of a variable as it is stored in the file e.g. often 'temp' or 'T' instead of Temperature
+        var: The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of Temperature) or the
+            band number if you are using grib files and you specify the engine as pygrib
         t_dim: Name of the time variable if it is used in the files. Default: 'time'
         strp: A string compatible with datetime.strptime for extracting datetime pattern in file names
         stats: How to reduce the array into a single value for the timeseries.
@@ -312,7 +317,8 @@ def full_array_stats(files: list,
         vs[vs == fill_value] = np.nan
         for stat in stats:
             results[stat] += _array_to_stat_list(vs, stat)
-        opened_file.close()
+        if engine != 'pygrib':
+            opened_file.close()
 
     # return the data stored in a dataframe
     return pd.DataFrame(results)
@@ -338,12 +344,24 @@ def _slicing_info(path: str,
         raise ValueError(f'the variable "{var}" was not found in the file {path}')
 
     # if its a netcdf or grib, the dimensions should be included by xarray
-    if engine in ('xarray', 'cfgrib', 'netcdf4', 'rasterio'):
+    if engine in ('xarray', 'cfgrib'):
         dim_order = list(tmp_file[var].dims)
-    elif engine == 'hdf5':
+    elif engine == 'netcdf4':
+        dim_order = list(tmp_file[var].dimensions)
+    elif engine == 'pygrib':
+        dim_order = ['latitudes', 'longitudes']
+    elif engine == 'h5py':
         if h5_group is not None:
             tmp_file = tmp_file[h5_group]
         dim_order = [i.label for i in tmp_file[var].dims]
+    elif engine == 'rasterio':
+        dims = ['x', 'y', 'band']
+        dim_order = list(tmp_file.dims)
+        if min_coords is not None:
+            if len(min_coords) == 2:
+                min_coords = tuple(list(min_coords) + [1])
+                if max_coords is not None:
+                    max_coords = tuple(list(max_coords) + [1])
     else:
         raise ValueError(f'Unable to determine dims for engine: {engine}')
 
@@ -355,9 +373,9 @@ def _slicing_info(path: str,
         dim_order[i] = tmp
     dim_order = str.join(',', dim_order)
 
-    tmp_file.close()
-
     if min_coords is None and max_coords is None:
+        if engine != 'pygrib':
+            tmp_file.close()
         return dim_order, None
 
     if max_coords is None:
@@ -366,25 +384,33 @@ def _slicing_info(path: str,
     # gather all the indices
     slices_dict = dict(t_dim=slice(None))
 
-    # SLICING THE --X-- COORDINATE
-    steps = _array_by_engine(tmp_file, dims[0])
-    if steps.ndim == 2:
-        steps = steps[0, :]
-    slices_dict['dim0'] = _find_nearest_slice_index(steps, min_coords[0], max_coords[0])
-
-    # SLICING THE --Y-- COORDINATE
-    if len(min_coords) >= 2:
-        steps = _array_by_engine(tmp_file, dims[1])
+    if engine == 'pygrib':
+        slices_dict['dim0'] = _find_nearest_slice_index(
+            np.array(sorted(list(tmp_file[1].distinctLongitudes))), min_coords[0], max_coords[0])
+        slices_dict['dim1'] = _find_nearest_slice_index(
+            np.array(sorted(list(tmp_file[1].distinctLatitudes))), min_coords[0], max_coords[0])
+    else:
+        # SLICING THE --X-- COORDINATE
+        steps = _array_by_engine(tmp_file, dims[0])
         if steps.ndim == 2:
-            steps = steps[:, 0]
-        slices_dict['dim1'] = _find_nearest_slice_index(steps, min_coords[1], max_coords[1])
+            steps = steps[0, :]
+        slices_dict['dim0'] = _find_nearest_slice_index(steps, min_coords[0], max_coords[0])
 
-    # SLICING THE --Z-- AND OTHER ANY OTHER COORDINATES
-    if len(min_coords) >= 3:
-        for i in range(2, len(min_coords)):
-            steps = _array_by_engine(tmp_file, dims[i])
-            slices_dict[f'dim{i}'] = _find_nearest_slice_index(steps, min_coords[i], max_coords[i])
+        # SLICING THE --Y-- COORDINATE
+        if len(min_coords) >= 2:
+            steps = _array_by_engine(tmp_file, dims[1])
+            if steps.ndim == 2:
+                steps = steps[:, 0]
+            slices_dict['dim1'] = _find_nearest_slice_index(steps, min_coords[1], max_coords[1])
 
+        # SLICING THE --Z-- AND OTHER ANY OTHER COORDINATES
+        if len(min_coords) >= 3:
+            for i in range(2, len(min_coords)):
+                steps = _array_by_engine(tmp_file, dims[i])
+                slices_dict[f'dim{i}'] = _find_nearest_slice_index(steps, min_coords[i], max_coords[i])
+
+        if engine != 'pygrib':
+            tmp_file.close()
     return dim_order, tuple([slices_dict[d] for d in dim_order.split(',')])
 
 
@@ -400,9 +426,11 @@ def _gen_stat_list(stats: str or list):
 
 def _handle_time_steps(opened_file, file_path, t_dim, strp_string, h5_group):
     if strp_string:
-        return datetime.datetime.strptime(file_path, strp_string)
+        return [datetime.datetime.strptime(os.path.basename(file_path), strp_string), ]
     else:  # use the time variable
         ts = _array_by_engine(opened_file, t_dim, h5_group=h5_group)
+        if isinstance(ts, np.datetime64):
+            return [ts]
         if ts.ndim == 0:
             return ts
         else:

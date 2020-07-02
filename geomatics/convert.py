@@ -150,7 +150,7 @@ def to_mb_gtiff(files: list,
                 fill_value: int = -9999,
                 save_dir: str = False,
                 save_name: str = False,
-                delete_sources: bool = False) -> list:
+                delete_sources: bool = False) -> str:
     """
     Converts the array of data for a certain variable in a grib file to a geotiff.
 

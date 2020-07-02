@@ -29,8 +29,8 @@ or depth. Common examples of data stored in this format include:
 
 In each of the previous examples, data varied with respect to spatial dimensions only. Some files include multiple time steps or data
 in the same file. Thus the data would be spatiotemporal data where each varies with respect to time or the time of observation is relevant.
-Each of the previous 1, 2, and 3 dimensional data could be 2, 3, and 4 dimensional data where the addional dimension is time. While most data
-does have a time dimension, not all file structures list it explicitly.
+Each of the previous 1, 2, and 3 dimensional data could be 2, 3, and 4 dimensional data where the additional dimension is time. While all data
+does have a time associated with it's creation or forecast time, not all file structures list it explicitly.
 
 Handling Time Information
 ~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -7,9 +7,8 @@ eccodes
 cfgrib
 python-dateutil
 numpy
-pandas
+pandas>=1
 requests
 pyshp
 affine
-pillow
 geopandas

@@ -1,9 +1,15 @@
 import h5py
+import netCDF4 as nc
 import numpy as np
+import pygrib
 import xarray as xr
-from PIL import TiffImagePlugin, Image
 
 __all__ = ['_open_by_engine', '_array_by_engine', '_pick_engine', '_check_var_in_dataset', '_array_to_stat_list']
+
+NETCDF_EXTENSIONS = ('.nc', '.nc4')
+GRIB_EXTENSIONS = ('.grb', '.grib', '.grib2')
+HDF_EXTENSIONS = ('.h5', '.hd5', '.hdf5')
+GEOTIFF_EXTENSIONS = ('.gtiff', '.tiff', 'tif')
 
 
 def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None) -> np.array:
@@ -13,54 +19,64 @@ def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None) 
         backend_kwargs = dict()
     if engine == 'xarray':
         return xr.open_dataset(path, backend_kwargs=backend_kwargs)
+    elif engine == 'netcdf4':
+        return nc.Dataset(path, 'r')
     elif engine == 'cfgrib':
         return xr.open_dataset(path, engine='cfgrib', backend_kwargs=backend_kwargs)
+    elif engine == 'pygrib':
+        a = pygrib.open(path)
+        return a.read()
     elif engine == 'h5py':
         return h5py.File(path, 'r')
-    elif engine in ('PIL', 'pillow'):
-        return Image.open(path, 'r')
     elif engine == 'rasterio':
         return xr.open_rasterio(path)
     else:
         raise ValueError(f'Unable to open file, unsupported engine: {engine}')
 
 
-def _array_by_engine(open_file, var: str, h5_group: str = None):
-    if isinstance(open_file, xr.Dataset):  # xarray
+def _array_by_engine(open_file, var: str or int, h5_group: str = None):
+    if isinstance(open_file, xr.Dataset):  # xarray, cfgrib
         return open_file[var].data
-    elif isinstance(open_file, h5py.Dataset):  # h5py
-        # not using open_file[:] because [:] can't slice string data but ... catches it all
+    elif isinstance(open_file, xr.DataArray):  # rasterio
+        if isinstance(var, int):
+            return open_file.data
+        return open_file[var].data
+    elif isinstance(open_file, nc.Dataset):  # netcdf4
+        return open_file[var][:]
+    elif isinstance(open_file, list):  # pygrib
+        return open_file[var].values
+    elif isinstance(open_file, h5py.File) or isinstance(open_file, h5py.Dataset):  # h5py
         if h5_group is not None:
             open_file = open_file[h5_group]
-        return open_file[...]
-    elif isinstance(open_file, TiffImagePlugin.TiffImageFile):  # geotiff
-        return np.array(open_file)
+        return open_file[var][:]  # might need to use [...] for string data
     else:
         raise ValueError(f'Unrecognized opened file dataset: {type(open_file)}')
 
 
 def _pick_engine(path: str) -> str:
-    if path.endswith('.nc') or path.endswith('.nc4'):
-        return 'xarray'
-    elif path.endswith('.grb') or path.endswith('.grib'):
+    if any(path.endswith(i) for i in NETCDF_EXTENSIONS):
+        return 'netcdf4'
+    if any(path.endswith(i) for i in GRIB_EXTENSIONS):
         return 'cfgrib'
-    elif path.endswith('.gtiff') or path.endswith('.tiff') or path.endswith('tif'):
-        return 'rasterio'
-    elif path.endswith('.h5') or path.endswith('.hd5') or path.endswith('.hdf5'):
+    elif any(path.endswith(i) for i in HDF_EXTENSIONS):
         return 'h5py'
+    if any(path.endswith(i) for i in GEOTIFF_EXTENSIONS):
+        return 'rasterio'
     else:
-        raise ValueError(f'File does not match known files extension patterns: {path}')
+        raise ValueError(f'File name does not match known files extensions, engine could not be guessed: {path}')
 
 
-def _check_var_in_dataset(open_file, variable, h5_group):
-    if isinstance(open_file, xr.Dataset):  # xarray
-        return bool(variable in open_file.variables)
-    elif isinstance(open_file, h5py.Dataset):  # h5py
+def _check_var_in_dataset(open_file, var, h5_group):
+    if isinstance(open_file, xr.Dataset) or isinstance(open_file, nc.Dataset):  # xarray, netcdf4
+        return bool(var in open_file.variables)
+    elif isinstance(open_file, list):  # pygrib comes as lists of messages
+        return bool(var <= len(open_file))
+    elif isinstance(open_file, h5py.File) or isinstance(open_file, h5py.Dataset):  # h5py
         if h5_group is not None:
             open_file = open_file[h5_group]
-        return bool(variable in open_file.keys())
-    elif isinstance(open_file, TiffImagePlugin.TiffImageFile):  # geotiff
-        return False
+        return bool(var in open_file.keys())
+    elif isinstance(open_file, xr.DataArray):
+        return bool(var <= open_file.band.shape[0])
     else:
         raise ValueError(f'Unrecognized opened file dataset: {type(open_file)}')
 
