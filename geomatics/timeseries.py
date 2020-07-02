@@ -13,6 +13,7 @@ from .data import gen_affine
 
 __all__ = ['point', 'bounding_box', 'polygons', 'full_array_stats']
 ALL_STATS = ('mean', 'median', 'max', 'min', 'sum', 'std')
+ALL_ENGINES = ('xarray', 'netcdf4', 'cfgrib', 'pygrib', 'h5py', 'rasterio')
 
 
 def point(files: list,
