@@ -1,6 +1,8 @@
+import datetime
 import os
 
 import affine
+import netCDF4 as nc
 import numpy as np
 import rasterio
 import shapefile
@@ -9,7 +11,7 @@ from rasterio.enums import Resampling
 from ._utils import _open_by_engine, _array_by_engine
 from .data import gen_affine
 
-__all__ = ['geojson_to_shapefile', 'to_gtiffs', 'to_mb_gtiff', 'upsample_gtiff']
+__all__ = ['geojson_to_shapefile', 'to_gtiffs', 'to_mb_gtiff', 'upsample_gtiff', 'tif_to_nc']
 
 
 def geojson_to_shapefile(geojson: dict, savepath: str) -> None:
@@ -152,7 +154,7 @@ def to_mb_gtiff(files: list,
                 save_name: str = False,
                 delete_sources: bool = False) -> str:
     """
-    Converts the array of data for a certain variable in a grib file to a geotiff.
+    Converts a 3D array of data for a certain variable in one or many files to a multiband geotiff.
 
     Args:
         files: A list of absolute paths to the appropriate type of files (even if len==1)
@@ -284,3 +286,66 @@ def upsample_gtiff(files: list, scale: float) -> list:
             dst.write(data, 1)
 
     return new_files
+
+
+def tif_to_nc(tif: str, var: str, time: datetime.datetime, ext: str = 'nc4', dtype: str = 'i2', fill: int or str = 0,
+              compress: bool = False, level: int = 9) -> None:
+    """
+    Converts a single tif to a netcdf compliant with the Common Data Model (CDM) and therefore able to be used by the
+    THREDDS data server
+
+    Args:
+        tif (str): path to the tif to convert
+        var (str): name to assign the netcdf variable where the geotiff information is stored
+        time (datetime.datetime): the start time of the data in the tiff
+        ext (str): the file extension to apply to the new file: either 'nc4' (default) or 'nc'
+        dtype (str): the netcdf datatype of the variable to store in the new netcdf: default to i2. consult
+            https://unidata.github.io/netcdf4-python/netCDF4/index.html
+        fill (int or str): the fill value to apply when using a masked array in the new variable's data array
+        compress (bool): True = compress the netcdf, False = do not compress the new file
+        level (int): An integer between 1 and 9. 1 = least compression and 9 = most compression
+
+    Returns:
+        None
+    """
+    # read the tif with the xarray wrapper to rasterio for convenience in coding
+    a = _open_by_engine(tif, engine='rasterio')
+    shape = a.values.shape
+
+    # create the new netcdf
+    new_nc = nc.Dataset(f'{os.path.splitext(tif)[0]}.{ext}', 'w')
+
+    # create latitude dimension, variable, add values, metadata
+    new_nc.createDimension('lat', shape[1])
+    new_nc.createVariable('lat', 'f', ('lat',))
+    new_nc['lat'].axis = "lat"
+    new_nc['lat'][:] = a.y.values
+    new_nc['lat'].units = "degrees_north"
+
+    # create longitude dimension, variable, add values, metadata
+    new_nc.createDimension('lon', shape[2])
+    new_nc.createVariable('lon', 'f', ('lon',))
+    new_nc['lon'][:] = a.x.values
+    new_nc['lon'].axis = "lon"
+    new_nc['lon'].units = "degrees_east"
+
+    # create time dimension, variable, add values AND specify the units string (essential for thredds)
+    new_nc.createDimension('time', 1)
+    new_nc.createVariable('time', 'i2', ('time',))
+    new_nc['time'].long_name = 'time'
+    new_nc['time'].units = f'days since {time.strftime("%Y-%m-%d %X")}'
+    new_nc['time'].calendar = 'standard'
+    new_nc['time'].axis = 'T'
+
+    # now create the variable which holds the tif's array (use a.values[0] because first dim is the band #)
+    if compress:
+        new_nc.createVariable(var, dtype, ('time', 'lat', 'lon'), fill_value=fill)
+    else:
+        new_nc.createVariable(var, dtype, ('time', 'lat', 'lon'), fill_value=fill, complevel=level, zlib=True)
+    new_nc[var].axis = "lat lon"
+    new_nc[var][:] = a.values
+
+    # save and close the new_nc
+    new_nc.sync()
+    new_nc.close()
+    return
