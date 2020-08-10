@@ -16,32 +16,33 @@ ALL_STATS = ('mean', 'median', 'max', 'min', 'sum', 'std')
 ALL_ENGINES = ('xarray', 'netcdf4', 'cfgrib', 'pygrib', 'h5py', 'rasterio')
 
 
-def point(files: list,
-          var: str or int,
-          coords: tuple,
-          dims: tuple = None,
-          t_dim: str = 'time',
-          strp: str = False,
-          fill_value: int = -9999,
-          engine: str = None,
-          h5_group: str = None,
-          xr_kwargs: dict = None, ) -> pd.DataFrame:
+def point(files: list, var: str or int, coords: tuple, dims: tuple, t_dim: str = 'time', fill_value: int = -9999,
+          time_from: str = 'var', strp: str = False, meta: str = False, ustring: str = 'detect',
+          engine: str = None, h5_group: str = None, xr_kwargs: dict = None, ) -> pd.DataFrame:
     """
     Creates a timeseries of values at the grid cell closest to a specified point.
 
     Args:
-        files: A list of absolute paths to netcdf, grib, or hdf5 files (even if len==1)
-        var: The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of Temperature) or the
-            band number if you are using grib files and you specify the engine as pygrib
-        coords: A tuple of the coordinates for the location of interest in the order (x, y, z)
-        dims: A tuple of the names of the (x, y, z) variables in the data files, the same you specified coords for.
+        files (list): A list of absolute paths to netcdf, grib, or hdf5 files (even if len==1)
+        var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
+            Temperature) or the band number if you are using grib files and you specify the engine as pygrib
+        coords (tuple): A tuple of the coordinates for the location of interest in the order (x, y, z)
+        dims (tuple): A tuple of the names of the (x, y, z) variables in the data files which you specified coords for.
             Defaults to common x, y, z variables names: ('lon', 'lat', 'depth')
             X dimension names are usually 'lon', 'longitude', 'x', or similar
             Y dimension names are usually 'lat', 'latitude', 'y', or similar
             Z dimension names are usually 'depth', 'elevation', 'z', or similar
-        t_dim: Name of the time variable if it is used in the files. Default: 'time'
+        t_dim (str): Name of the time variable if it is used in the files. Default: 'time'
+        fill_value (int): The value used for filling no_data spaces in the source file's array. Default: -9999
+        time_from (str): How time data is stored in the files. The value of this variable may require you specify
+            others parameters to succesfully parse the times. The options are:
+            - 'var': uses the value stored in the time variable
+            - 'units': uses the value in the time variable and interpreted as a date according to the unit string which
+                should follow the patter: unit_of_time since YYYY-MM-DD HH:MM:SS. you may specify the units string in
+                the `ustring` parameter or else it will attempt to detect the string in each file.
+            - 'filename': attempt to parse the correct date for the data from the file name. you must also provide the
+                `strp` parameter which is used by datetime.strptime
         strp: A string compatible with datetime.strptime for extracting datetime pattern in file names
-        fill_value: The value used for filling no_data spaces in the source file's array. Default: -9999
         engine: the python package used to power the file reading. Defaults to best for the type of input data
         h5_group: if all variables in the hdf5 file are in the same group, you can specify the name of the group here
         xr_kwargs: A dictionary of kwargs that you might need when opening complex grib files with xarray
@@ -87,7 +88,7 @@ def bounding_box(files: list,
                  var: str or int,
                  min_coords: tuple,
                  max_coords: tuple,
-                 dims: tuple = None,
+                 dims: tuple,
                  t_dim: str = 'time',
                  strp: str = False,
                  stats: str or list = 'mean',
@@ -158,7 +159,7 @@ def bounding_box(files: list,
 def polygons(files: list,
              var: str or int,
              poly: str or dict,
-             dims: tuple = None,
+             dims: tuple,
              t_dim: str = 'time',
              strp: str = False,
              stats: str = 'mean',
