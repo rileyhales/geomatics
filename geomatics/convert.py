@@ -292,7 +292,8 @@ def tif_to_nc(tif: str, var: str, time: datetime.datetime, ext: str = 'nc4', dty
               compress: bool = False, level: int = 9) -> None:
     """
     Converts a single tif to a netcdf compliant with the Common Data Model (CDM) and therefore able to be used by the
-    THREDDS data server
+    THREDDS data server. Your tif MUST be projected to a global coordinate system using latitude and longtiude for best
+    results with THREDDS so you MUST reproject your tif before using this function.
 
     Args:
         tif (str): path to the tif to convert
