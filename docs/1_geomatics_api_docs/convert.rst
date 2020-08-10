@@ -16,3 +16,10 @@ GeoTIFF
 .. automodule:: geomatics.convert
 	:members: to_gtiffs, to_mb_gtiff, upsample_gtiff
 	:noindex:
+
+netCDF4
+~~~~~~~
+
+.. automodule:: geomatics.convert
+	:members: tif_to_nc
+	:noindex:
