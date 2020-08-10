@@ -102,8 +102,8 @@ def download_nasa_gldas(save_path: str, start: datetime.date, end: datetime.date
     *Only works if you already have the prerequisite .netrc file with your username and password already
     configured on your machine.*
 
-    *This is not a recommended way to download NASA products. This works fine for retrieving a few sample files. For
-    a better solution, refer to NASA's GESDISC documentation. This is included for convenience in gathering sample data.*
+    *This is not a recommended way to download NASA products. This is included for convenience in gathering sample data.
+    . For a better solution, refer to NASA's GESDISC documentation.*
 
     Most GLDAS files are about 25Mb/file
 
