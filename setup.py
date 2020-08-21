@@ -12,7 +12,7 @@ setup(
     name='geomatics',
     packages=['geomatics'],
     version=version,
-    description='Tools for extracting time series from n-dimensional arrays data files and file format conversions',
+    description='Tools for extracting time series from n-dimensional arrays in many formats and file format conversions',
     long_description=long_description,
     long_description_content_type="text/markdown",
     author='Riley Hales',
