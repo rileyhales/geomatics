@@ -54,6 +54,8 @@ def _array_by_engine(open_file, var: str or int, h5_group: str = None):
 
 
 def _pick_engine(path: str) -> str:
+    if path.startswith('http'):  # reading from opendap
+        return 'xarray'
     if any(path.endswith(i) for i in NETCDF_EXTENSIONS):
         return 'netcdf4'
     if any(path.endswith(i) for i in GRIB_EXTENSIONS):

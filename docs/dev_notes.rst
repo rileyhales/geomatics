@@ -39,7 +39,7 @@ https://docs.conda.io/projects/conda/en/latest/user-guide/configuration/use-cond
 
 Developing documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Use Sphinx
+Use Sphinx. Be sure to add mock imports to the conf.py file if the dependencies change or the build will fail.
 
 .. code-block:: bash
 
