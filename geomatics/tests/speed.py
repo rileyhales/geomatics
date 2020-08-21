@@ -1,5 +1,6 @@
 # adapted directly from the plotly documentation https://plotly.com/python/bar-charts/
 # https://plotly.com/python/static-image-export/#vector-formats-svg-and-pdf
+# conda install geomatics==0.10
 # conda install plotly
 # conda install -c plotly plotly-orca==1.2.1 psutil requests
 
@@ -19,7 +20,7 @@ def test_engine(files: list, var: str or int, coords: tuple, min_coords, max_coo
     t2 = datetime.datetime.now()
     geomatics.timeseries.bounding_box(files, var, min_coords, max_coords, dims, engine=engine, xr_kwargs=xr_kwargs, strp=strp)
     t3 = datetime.datetime.now()
-    geomatics.timeseries.polygons(files, var, poly, dims, engine=engine, xr_kwargs=xr_kwargs, strp=strp)
+    geomatics.timeseries.polygons(files, var, poly, dims, engine=engine, xr_kwargs=xr_kwargs)
     t4 = datetime.datetime.now()
     geomatics.timeseries.full_array_stats(files, var, engine=engine, xr_kwargs=xr_kwargs, strp=strp)
     t5 = datetime.datetime.now()

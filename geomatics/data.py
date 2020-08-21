@@ -208,11 +208,7 @@ def get_livingatlas_geojson(location: str = None) -> dict:
     return json.loads(req.text)
 
 
-def gen_affine(path: str,
-               x_var: str = 'lon',
-               y_var: str = 'lat',
-               engine: str = None,
-               xr_kwargs: dict = None,
+def gen_affine(path: str, x_var: str = 'lon', y_var: str = 'lat', engine: str = None, xr_kwargs: dict = None,
                h5_group: str = None) -> affine.Affine:
     """
     Creates an affine transform from the dimensions of the coordinate variable data in a netCDF file

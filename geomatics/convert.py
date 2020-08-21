@@ -5,60 +5,12 @@ import affine
 import netCDF4 as nc
 import numpy as np
 import rasterio
-import shapefile
 from rasterio.enums import Resampling
 
 from ._utils import _open_by_engine, _array_by_engine
 from .data import gen_affine
 
-__all__ = ['geojson_to_shapefile', 'to_gtiffs', 'to_mb_gtiff', 'upsample_gtiff', 'tif_to_nc']
-
-
-def geojson_to_shapefile(geojson: dict, savepath: str) -> None:
-    """
-    Turns a valid dict, json, or geojson containing polygon data in a geographic coordinate system into a shapefile
-
-    Args:
-        geojson: a valid geojson as a dictionary or json python object. try json.loads for strings
-        savepath: the full file path to save the shapefile to, including the file_name.shp
-    """
-    # create the shapefile
-    fileobject = shapefile.Writer(target=savepath, shpType=shapefile.POLYGON, autoBalance=True)
-
-    # label all the columns in the .dbf
-    geomtype = geojson['features'][0]['geometry']['type']
-    if geojson['features'][0]['properties']:
-        for attribute in geojson['features'][0]['properties']:
-            fileobject.field(str(attribute), 'C', '30')
-    else:
-        fileobject.field('Name', 'C', '50')
-
-    # add the geometry and attribute data
-    for feature in geojson['features']:
-        # record the geometry
-        if geomtype == 'Polygon':
-            fileobject.poly(polys=feature['geometry']['coordinates'])
-        elif geomtype == 'MultiPolygon':
-            for i in feature['geometry']['coordinates']:
-                fileobject.poly(polys=i)
-
-        # record the attributes in the .dbf
-        if feature['properties']:
-            fileobject.record(**feature['properties'])
-        else:
-            fileobject.record('unknown')
-
-    # close writing to the shapefile
-    fileobject.close()
-
-    # create a prj file
-    if savepath.endswith('.shp'):
-        savepath.replace('.shp', '')
-    with open(savepath + '.prj', 'w') as prj:
-        prj.write('GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],'
-                  'PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]')
-
-    return
+__all__ = ['to_gtiffs', 'to_mb_gtiff', 'upsample_gtiff']
 
 
 def to_gtiffs(files: list,

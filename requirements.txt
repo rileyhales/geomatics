@@ -9,7 +9,6 @@ python-dateutil
 numpy
 pandas>=1
 requests
-pyshp
 affine
 geopandas
 pygrib
