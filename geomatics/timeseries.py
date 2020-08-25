@@ -21,13 +21,13 @@ RECOGNIZED_TIME_INTERVALS = ('years', 'months', 'weeks', 'days', 'hours', 'minut
 def point(files: list, var: str or int, coords: tuple, dims: tuple, t_var: str = 'time', fill_value: int = -9999,
           interp_units: bool = False, unit_str: str = None, origin_format: str = None, strp_filename: str = None,
           engine: str = None, h5_group: str = None, xr_kwargs: dict = None, ) -> pd.DataFrame:
-    f"""
+    """
     Creates a timeseries of values at the grid cell closest to a specified point.
 
     The datetime for each value extracted can be assigned 4 ways and is assigned in this order of preference:
         1. When interp_units is True, interpret the values in the time variable as datetimes using their units
         2. When a pattern is specified with strp_filename, the datetime extracted from the filename is applied to all
-            values coming from that dataset
+           values coming from that dataset
         3. The numerical values from the time variable are used without further interpretation
         4. The string file name is used if there is no time variable and no other options were provided
 
@@ -106,7 +106,7 @@ def bounding_box(files: list, var: str or int, min_coords: tuple, max_coords: tu
     The datetime for each value extracted can be assigned 4 ways and is assigned in this order of preference:
         1. When interp_units is True, interpret the values in the time variable as datetimes using their units
         2. When a pattern is specified with strp_filename, the datetime extracted from the filename is applied to all
-            values coming from that dataset
+           values coming from that dataset
         3. The numerical values from the time variable are used without further interpretation
         4. The string file name is used if there is no time variable and no other options were provided
 
@@ -188,7 +188,7 @@ def polygons(files: list, var: str or int, poly: str or dict, dims: tuple, t_var
     The datetime for each value extracted can be assigned 4 ways and is assigned in this order of preference:
         1. When interp_units is True, interpret the values in the time variable as datetimes using their units
         2. When a pattern is specified with strp_filename, the datetime extracted from the filename is applied to all
-            values coming from that dataset
+           values coming from that dataset
         3. The numerical values from the time variable are used without further interpretation
         4. The string file name is used if there is no time variable and no other options were provided
 
@@ -309,7 +309,7 @@ def full_array_stats(files: list, var: str or int, t_var: str = 'time', fill_val
     The datetime for each value extracted can be assigned 4 ways and is assigned in this order of preference:
         1. When interp_units is True, interpret the values in the time variable as datetimes using their units
         2. When a pattern is specified with strp_filename, the datetime extracted from the filename is applied to all
-            values coming from that dataset
+           values coming from that dataset
         3. The numerical values from the time variable are used without further interpretation
         4. The string file name is used if there is no time variable and no other options were provided
 
@@ -318,11 +318,6 @@ def full_array_stats(files: list, var: str or int, t_var: str = 'time', fill_val
             urls to an OPENDAP service (but beware the network data transfer speed bottleneck)
         var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
             Temperature) or the band number if you are using grib files and you specify the engine as pygrib
-        poly: the path to a shapefile or geojson in the same coordinate system and projection as the raster data
-        dims (tuple): A tuple of the names of the (x, y, z) variables in the data files which you specified coords for.
-            X dimension names are usually 'lon', 'longitude', 'x', or similar
-            Y dimension names are usually 'lat', 'latitude', 'y', or similar
-            Z dimension names are usually 'depth', 'elevation', 'z', or similar
         t_var (str): Name of the time variable if it is used in the files. Default: 'time'
         stats (list or str): How to reduce the values within the bounding box into a single value for the timeseries.
             Options include: mean, median, max, min, sum, std, a percentile (e.g. 25%) or all.
