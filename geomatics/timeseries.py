@@ -33,7 +33,7 @@ def point(files: list, var: str or int, coords: tuple, dims: tuple, t_var: str =
 
     Args:
         files (list): A list (even if len==1) of either absolute file paths to netcdf, grib, hdf5, or geotiff files or
-            urls to an OPENDAP service (but beware the network data transfer speed bottleneck)
+            urls to an OPENDAP service (but beware the data transfer speed bottleneck)
         var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
             Temperature) or the band number if you are using grib files and you specify the engine as pygrib
         coords (tuple): A tuple of the coordinates for the location of interest in the order (x, y, z)
@@ -112,7 +112,7 @@ def bounding_box(files: list, var: str or int, min_coords: tuple, max_coords: tu
 
     Args:
         files (list): A list (even if len==1) of either absolute file paths to netcdf, grib, hdf5, or geotiff files or
-            urls to an OPENDAP service (but beware the network data transfer speed bottleneck)
+            urls to an OPENDAP service (but beware the data transfer speed bottleneck)
         var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
             Temperature) or the band number if you are using grib files and you specify the engine as pygrib
         min_coords: A tuple of the minimum coordinates for the region of interest in the order (x, y, z)
@@ -194,7 +194,7 @@ def polygons(files: list, var: str or int, poly: str or dict, dims: tuple, t_var
 
     Args:
         files (list): A list (even if len==1) of either absolute file paths to netcdf, grib, hdf5, or geotiff files or
-            urls to an OPENDAP service (but beware the network data transfer speed bottleneck)
+            urls to an OPENDAP service (but beware the data transfer speed bottleneck)
         var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
             Temperature) or the band number if you are using grib files and you specify the engine as pygrib
         poly: the path to a shapefile or geojson in the same coordinate system and projection as the raster data
@@ -315,7 +315,7 @@ def full_array_stats(files: list, var: str or int, t_var: str = 'time', fill_val
 
     Args:
         files (list): A list (even if len==1) of either absolute file paths to netcdf, grib, hdf5, or geotiff files or
-            urls to an OPENDAP service (but beware the network data transfer speed bottleneck)
+            urls to an OPENDAP service (but beware the data transfer speed bottleneck)
         var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
             Temperature) or the band number if you are using grib files and you specify the engine as pygrib
         t_var (str): Name of the time variable if it is used in the files. Default: 'time'

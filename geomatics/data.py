@@ -252,7 +252,6 @@ def gen_affine(path: str, x_var: str = 'lon', y_var: str = 'lat', engine: str = 
     return affine.Affine(lon[1] - lon[0], 0, lon.min(), 0, lat[0] - lat[1], lat.max())
 
 
-# NCML tool
 def gen_ncml(files: list, save_dir: str, time_interval: int) -> None:
     """
     Generates a ncml file which aggregates a list of netcdf files across the "time" dimension and the "time" variable.

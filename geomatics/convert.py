@@ -10,7 +10,6 @@ from rasterio.enums import Resampling
 from ._utils import _open_by_engine, _array_by_engine
 from .data import gen_affine
 
-
 __all__ = ['to_gtiffs', 'to_mb_gtiff', 'upsample_gtiff']
 
 
@@ -241,7 +240,7 @@ def upsample_gtiff(files: list, scale: float) -> list:
     return new_files
 
 
-def tif_to_nc(tif: str, var: str, time: datetime.datetime, ext: str = 'nc4', dtype: str = 'i2', fill: int or str = 0,
+def tif_to_nc(tif: str, var: str, time: datetime.datetime, dtype: str = 'i2', fill: int or str = 0,
               compress: bool = False, level: int = 9) -> None:
     """
     Converts a single tif to a netcdf compliant with the Common Data Model (CDM) and therefore able to be used by the
@@ -252,7 +251,6 @@ def tif_to_nc(tif: str, var: str, time: datetime.datetime, ext: str = 'nc4', dty
         tif (str): path to the tif to convert
         var (str): name to assign the netcdf variable where the geotiff information is stored
         time (datetime.datetime): the start time of the data in the tiff
-        ext (str): the file extension to apply to the new file: either 'nc4' (default) or 'nc'
         dtype (str): the netcdf datatype of the variable to store in the new netcdf: default to i2. consult
             https://unidata.github.io/netcdf4-python/netCDF4/index.html
         fill (int or str): the fill value to apply when using a masked array in the new variable's data array
@@ -267,7 +265,7 @@ def tif_to_nc(tif: str, var: str, time: datetime.datetime, ext: str = 'nc4', dty
     shape = a.values.shape
 
     # create the new netcdf
-    new_nc = nc.Dataset(f'{os.path.splitext(tif)[0]}.{ext}', 'w')
+    new_nc = nc.Dataset(f'{os.path.splitext(tif)[0]}.nc4', 'w')
 
     # create latitude dimension, variable, add values, metadata
     new_nc.createDimension('lat', shape[1])

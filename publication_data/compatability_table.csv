@@ -1,0 +1,8 @@
+﻿,NetCDF4,GRIB2,HDF5,GeoTIFF
+xarray (python),X,X,,X
+h5py (python),X,,X,
+netCDF4 (python),X,,,
+pygrib (python),,X,,
+rasterio (python),,,,X
+ArcGIS (GIS),X,X,X,X
+QGIS (GIS),X,X,X,X
