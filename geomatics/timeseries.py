@@ -12,17 +12,22 @@ from dateutil.relativedelta import relativedelta
 from ._utils import _open_by_engine, _array_by_engine, _pick_engine, _check_var_in_dataset, _array_to_stat_list
 from .data import gen_affine
 
-__all__ = ['point', 'bounding_box', 'polygons', 'full_array_stats']
+__all__ = ['time_series']
 ALL_STATS = ('mean', 'median', 'max', 'min', 'sum', 'std')
 ALL_ENGINES = ('xarray', 'netcdf4', 'cfgrib', 'pygrib', 'h5py', 'rasterio')
 RECOGNIZED_TIME_INTERVALS = ('years', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds')
 
 
-def point(files: list, var: str or int, coords: tuple, dims: tuple, t_var: str = 'time', fill_value: int = -9999,
-          interp_units: bool = False, unit_str: str = None, origin_format: str = None, strp_filename: str = None,
-          engine: str = None, h5_group: str = None, xr_kwargs: dict = None, ) -> pd.DataFrame:
+def time_series(
+        files: list, var: str or int, dim_order: tuple, t_var: str = 'time', crs: str = '+proj=latlong',
+        point: tuple = None, bound: tuple = None, array: bool = False, polys: str = None, stats: list or str = 'mean',
+        interp_units: bool = False, unit_str: str = None, origin_format: str = None, strp_filename: str = None,
+        h5_group: str = None, xr_kwargs: dict = None, fill_value: int = -9999, **kwargs
+) -> pd.DataFrame:
     """
-    Creates a timeseries of values at the grid cell closest to a specified point.
+    Creates a time series of values from arrays contained in netCDF, grib, hdf, or geotiff formats. Values in the series
+    are extracted from a point, bounding box, or shapefile/geojson subset of the array, or are summary statistics of the
+    entire array.
 
     The datetime for each value extracted can be assigned 4 ways and is assigned in this order of preference:
         1. When interp_units is True, interpret the values in the time variable as datetimes using their units
@@ -36,11 +41,13 @@ def point(files: list, var: str or int, coords: tuple, dims: tuple, t_var: str =
             urls to an OPENDAP service (but beware the data transfer speed bottleneck)
         var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
             Temperature) or the band number if you are using grib files and you specify the engine as pygrib
-        coords (tuple): A tuple of the coordinates for the location of interest in the order (x, y, z)
         dims (tuple): A tuple of the names of the (x, y, z) variables in the data files which you specified coords for.
             X dimension names are usually 'lon', 'longitude', 'x', or similar
             Y dimension names are usually 'lat', 'latitude', 'y', or similar
             Z dimension names are usually 'depth', 'elevation', 'z', or similar
+        stats (list or str): How to reduce arrays of values to a single scalar value for the timeseries.
+            Options include: mean, median, max, min, sum, std, a percentile (e.g. 25%) or all.
+            Provide a list of strings (e.g. ['mean', 'max']), or a comma separated string (e.g. 'mean,max,min')
         t_var (str): Name of the time variable if it is used in the files. Default: 'time'
         fill_value (int): The value used for filling no_data spaces in the source file's array. Default: -9999
         interp_units (bool): If your data conforms to the CF NetCDF standard for time data, choose True to
@@ -61,100 +68,80 @@ def point(files: list, var: str or int, coords: tuple, dims: tuple, t_var: str =
     Returns:
         pandas.DataFrame with an index, datetime column, and a column of values for each stat specified
     """
-    if engine is None:
-        engine = _pick_engine(files[0])
+    if not (isinstance(files, list) or isinstance(files, tuple)):
+        raise TypeError(f'Expected list of strings (paths/urls) for the "files" argument. Got: {type(files)}')
 
-    # get information to slice the array with
-    dim_order, slices = _slicing_info(files[0], var, coords, None, dims, t_var, engine, xr_kwargs, h5_group)
+    engine = kwargs.get('engine', _pick_engine(files[0]))
 
     # make the return item
     results = dict(datetime=[], values=[])
 
-    # iterate over each file extracting the value and time for each
-    for file in files:
-        # open the file
-        opened_file = _open_by_engine(file, engine, xr_kwargs)
-        results['datetime'] += list(_handle_time_steps(
-            opened_file, file, t_var, interp_units, unit_str, origin_format, strp_filename, h5_group))
+    if point is not None:
+        slices = _coords_to_slices(_open_by_engine(files[0]), dim_order, t_var, point, h5_group=h5_group)
 
-        # extract the appropriate values from the variable
-        vs = _array_by_engine(opened_file, var, h5_group)[slices]
-        if vs.ndim == 0:
-            if vs == fill_value:
-                vs = np.nan
-            results['values'].append(vs)
-        elif vs.ndim == 1:
-            vs[vs == fill_value] = np.nan
-            for v in vs:
-                results['values'].append(v)
-        else:
-            raise ValueError('There are too many dimensions')
-        if engine != 'pygrib':
-            opened_file.close()
+        # iterate over each file extracting the value and time for each
+        for file in files:
+            # open the file
+            opened_file = _open_by_engine(file, engine, xr_kwargs)
+            results['datetime'] += list(_handle_time_steps(
+                opened_file, file, t_var, interp_units, unit_str, origin_format, strp_filename, h5_group))
 
-    # return the data stored in a dataframe
-    return pd.DataFrame(results)
+            # extract the appropriate values from the variable
+            vs = _array_by_engine(opened_file, var, h5_group)[slices]
+            if vs.ndim == 0:
+                if vs == fill_value:
+                    vs = np.nan
+                results['values'].append(vs)
+            elif vs.ndim == 1:
+                vs[vs == fill_value] = np.nan
+                for v in vs:
+                    results['values'].append(v)
+            else:
+                raise ValueError('There are too many dimensions')
+            if engine != 'pygrib':
+                opened_file.close()
+
+        # return the data stored in a dataframe
+        return pd.DataFrame(results)
+
+    # elif bound is not None:
+    #     slices = _coords_to_slices(files[0], dim_order, bound)
+    #
+    #     # add a list for each stat requested
+    #     for stat in stats:
+    #         results[stat] = []
+    #
+    #     # iterate over each file extracting the value and time for each
+    #     for file in files:
+    #         # open the file
+    #         opened_file = _open_by_engine(file, engine, xr_kwargs)
+    #         # get the times
+    #         results['datetime'] += list(_handle_time_steps(
+    #             opened_file, file, t_var, interp_units, unit_str, origin_format, strp_filename, h5_group))
+    #
+    #         # slice the variable's array, returns array with shape corresponding to dimension order and size
+    #         vs = _array_by_engine(opened_file, var, h5_group=h5_group)[slices]
+    #         vs[vs == fill_value] = np.nan
+    #         for stat in stats:
+    #             results[stat] += _array_to_stat_list(vs, stat)
+    #         if engine != 'pygrib':
+    #             opened_file.close()
+    #     # return the data stored in a dataframe
+    #     return pd.DataFrame(results)
+    # elif polys is not None:
+    #     return _polys(files, engine, var, slices, stats, time_opts, fill_value, h5_group=h5_group, xr_kwargs=xr_kwargs)
+    # elif array:
+    #     return _array()
+    else:
+        raise ValueError('Must provide the point, bound, polygon, or array parameter.')
 
 
-def bounding_box(files: list, var: str or int, min_coords: tuple, max_coords: tuple, dims: tuple, t_var: str = 'time',
-                 fill_value: int = -9999, stats: list or str = 'mean',
-                 interp_units: bool = False, unit_str: str = None, origin_format: str = None, strp_filename: str = None,
-                 engine: str = None, h5_group: str = None, xr_kwargs: dict = None, ) -> pd.DataFrame:
-    """
-    Creates a timeseries of values based on values within a bounding box specified by your coordinates.
-
-    The datetime for each value extracted can be assigned 4 ways and is assigned in this order of preference:
-        1. When interp_units is True, interpret the values in the time variable as datetimes using their units
-        2. When a pattern is specified with strp_filename, the datetime extracted from the filename is applied to all
-           values coming from that dataset
-        3. The numerical values from the time variable are used without further interpretation
-        4. The string file name is used if there is no time variable and no other options were provided
-
-    Args:
-        files (list): A list (even if len==1) of either absolute file paths to netcdf, grib, hdf5, or geotiff files or
-            urls to an OPENDAP service (but beware the data transfer speed bottleneck)
-        var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
-            Temperature) or the band number if you are using grib files and you specify the engine as pygrib
-        min_coords: A tuple of the minimum coordinates for the region of interest in the order (x, y, z)
-        max_coords: A tuple of the maximum coordinates for the region of interest in the order (x, y, z)
-        dims (tuple): A tuple of the names of the (x, y, z) variables in the data files which you specified coords for.
-            X dimension names are usually 'lon', 'longitude', 'x', or similar
-            Y dimension names are usually 'lat', 'latitude', 'y', or similar
-            Z dimension names are usually 'depth', 'elevation', 'z', or similar
-        t_var (str): Name of the time variable if it is used in the files. Default: 'time'
-        stats (list or str): How to reduce the values within the bounding box into a single value for the timeseries.
-            Options include: mean, median, max, min, sum, std, a percentile (e.g. 25%) or all.
-            Provide a list of strings (e.g. ['mean', 'max']), or a comma separated string (e.g. 'mean,max,min')
-        fill_value (int): The value used for filling no_data spaces in the source file's array. Default: -9999
-        interp_units (bool): If your data conforms to the CF NetCDF standard for time data, choose True to
-            convert the values in the time variable to datetime strings in the pandas output. The units string for the
-            time variable of each file is checked separately unless you specify it in the unit_str parameter.
-        unit_str (str): a CF Standard conformant string indicating how the spacing and origin of the time values.
-            Only specify this if ALL files that you query will contain the same units string. This is helpful if your
-            files do not contain a units string. Usually this looks like "step_size since YYYY-MM-DD HH:MM:SS" such as
-            "days since 2000-01-01 00:00:00".
-        origin_format (str): A datetime.strptime string for extracting the origin time from the units string. Defaults
-            to "%Y-%m-%d %X"
-        strp_filename (str): A string compatible with datetime.strptime for extracting datetimes from patterns in file
-            names.
-        engine (str): the python package used to power the file reading. Defaults to best for the type of input data
-        h5_group (str): if all variables in the hdf5 file are in the same group, specify the name of the group here
-        xr_kwargs (dict): A dictionary of kwargs that you might need when opening complex grib files with xarray
-
-    Returns:
-        pandas.DataFrame with an index, datetime column, and a column of values for each stat specified
-    """
-    if engine is None:
-        engine = _pick_engine(files[0])
-
-    # interpret the choice of statistics provided
-    stats = _gen_stat_list(stats)
-
-    # get information to slice the array with
-    dim_order, slices = _slicing_info(files[0], var, min_coords, max_coords, dims, t_var, engine, xr_kwargs, h5_group)
-
+def _bound(files: list, engine: str, var: str or int, slices: tuple, stats: list, fill_value: int,
+           t_var: str, interp_units: bool, unit_str: str, origin_format: str, strp_filename: str,
+           h5_group: str = None, xr_kwargs: dict = None, ) -> pd.DataFrame:
     # make the return item
     results = dict(datetime=[])
+
     # add a list for each stat requested
     for stat in stats:
         results[stat] = []
@@ -178,10 +165,10 @@ def bounding_box(files: list, var: str or int, min_coords: tuple, max_coords: tu
     return pd.DataFrame(results)
 
 
-def polygons(files: list, var: str or int, poly: str or dict, dims: tuple, t_var: str = 'time', fill_value: int = -9999,
-             stats: str = 'mean', crs: str = '+proj=latlong',
-             interp_units: bool = False, unit_str: str = None, origin_format: str = None, strp_filename: str = None,
-             engine: str = None, h5_group: str = None, xr_kwargs: dict = None, ) -> pd.DataFrame:
+def _polys(files: list, var: str or int, poly: str or dict, dims: tuple, t_var: str = 'time', fill_value: int = -9999,
+           stats: str = 'mean', crs: str = '+proj=latlong',
+           interp_units: bool = False, unit_str: str = None, origin_format: str = None, strp_filename: str = None,
+           engine: str = None, h5_group: str = None, xr_kwargs: dict = None, ) -> pd.DataFrame:
     """
     Creates a timeseries of values within the boundaries of your polygon shapefile of the same coordinate system.
 
@@ -284,7 +271,7 @@ def polygons(files: list, var: str or int, poly: str or dict, dims: tuple, t_var
             dim_order = 't' + dim_order
         if t_var in dim_order:
             # roll axis brings the time dimension to the front so we can iterate over it -- may not work as expected
-            vs = np.rollaxis(vs, dim_order.index('t'))
+            vs = np.rollaxis(vs, dim_order.index(t_var))
 
         # do zonal statistics on everything
         for slice_2d in vs:
@@ -298,11 +285,11 @@ def polygons(files: list, var: str or int, poly: str or dict, dims: tuple, t_var
     return pd.DataFrame(results)
 
 
-def full_array_stats(files: list, var: str or int, t_var: str = 'time', fill_value: int = -9999,
-                     stats: list or str = 'mean',
-                     interp_units: bool = False, unit_str: str = None, origin_format: str = None,
-                     strp_filename: str = None, engine: str = None, h5_group: str = None,
-                     xr_kwargs: dict = None, ) -> pd.DataFrame:
+def _array(files: list, var: str or int, t_var: str = 'time', fill_value: int = -9999,
+           stats: list or str = 'mean',
+           interp_units: bool = False, unit_str: str = None, origin_format: str = None,
+           strp_filename: str = None, engine: str = None, h5_group: str = None,
+           xr_kwargs: dict = None, ) -> pd.DataFrame:
     """
     Creates a timeseries of values based on values within a bounding box specified by your coordinates.
 
@@ -471,6 +458,7 @@ def _handle_time_steps(opened_file, file_path, t_var, interp_units, unit_str, or
         if origin_format is None:
             origin_format = '%Y-%m-%d %X'
         if unit_str is None:
+            print(opened_file[t_var].attrs['units'])
             unit_str = opened_file[t_var].units
         return _delta_to_datetime(tvals, unit_str, origin_format)
     if strp_filename:  # strip the datetime from the file name
@@ -532,27 +520,43 @@ def _delta_to_datetime(tvals: np.array, ustr: str, origin_format: str = '%Y-%m-%
     return np.array([i.strftime("%Y-%m-%d %X") for i in a])
 
 
-def _find_nearest_slice_index(list_of_values: np.array, val1, val2=False):
-    try:
-        assert list_of_values.ndim == 1
-    except AssertionError as e:
-        raise e
+def _coords_to_slices(sample_file, dim_order: tuple, t_var: str, coords_min: tuple, coords_max: tuple = False,
+                      h5_group: str = None):
+    slices = []
 
-    min_val = list_of_values.min()
-    max_val = list_of_values.max()
-    if not max_val >= val1 >= min_val:
-        raise ValueError(f'specified coordinate value ({val1}) is outside the min/max range: [{min_val}, {max_val}]')
-    index1 = (np.abs(list_of_values - val1)).argmin()
+    for order, coord_var in enumerate(dim_order):
+        if coord_var == t_var:
+            slices.append(slice(None))
+            continue
+        vals = _array_by_engine(sample_file, coord_var, h5_group)
+        if vals.ndim != 1:
+            # todo try to reduce the array to 1 dimensional
+            raise RuntimeError(f"The coordinate variable {coord_var} is 2 dimensional and couldn't be reduced to 1")
 
-    if val2 is False:
-        return index1
+        min_val = vals.min()
+        max_val = vals.max()
 
-    if not max_val >= val2 >= min_val:
-        raise ValueError(f'specified coordinate value ({val2}) is outside the min/max range: [{min_val}, {max_val}]')
-    index2 = (np.abs(list_of_values - val2)).argmin()
-    if index1 == index2:
-        return index1
-    elif index1 < index2:  # we'll put this check in there just in case they got the coordinates wrong
-        return slice(index1, index2)
-    else:
-        return slice(index2, index1)
+        val1 = coords_min[order]
+        if not max_val >= val1 >= min_val:
+            raise ValueError(f'Coordinate value ({val1}) is outside the min/max range ({min_val}, '
+                             f'{max_val}) for the dimension {coord_var}')
+        index1 = (np.abs(vals - val1)).argmin()
+
+        if not coords_max:
+            slices.append(index1)
+            continue
+
+        val2 = coords_max[order]
+        if not max_val >= val2 >= min_val:
+            raise ValueError(f'Coordinate value ({val2}) is outside the min/max range ({min_val}, '
+                             f'{max_val}) for the dimension {coord_var}')
+        index2 = (np.abs(vals - val2)).argmin()
+
+        # check each option in case the index is the same or in case the coords were provided backwards
+        if index1 == index2:
+            slices.append(index1)
+        elif index1 < index2:
+            slices.append(slice(index1, index2))
+        else:
+            slices.append(slice(index2, index1))
+    return tuple(slices)

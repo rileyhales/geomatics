@@ -14,15 +14,18 @@ import geomatics
 
 
 def test_engine(files: list, var: str or int, coords: tuple, min_coords, max_coords, dims: tuple, engine: str,
-                poly: str, xr_kwargs: dict = None, strp: str = None):
+                poly: str, xr_kwargs: dict = None, strp_filename: str = None):
     t1 = datetime.datetime.now()
-    geomatics.timeseries.point(files, var, coords, dims, engine=engine, xr_kwargs=xr_kwargs, strp=strp)
+    geomatics.timeseries.point(files, var, coords, dims, engine=engine, xr_kwargs=xr_kwargs,
+                               strp_filename=strp_filename)
     t2 = datetime.datetime.now()
-    geomatics.timeseries.bounding_box(files, var, min_coords, max_coords, dims, engine=engine, xr_kwargs=xr_kwargs, strp=strp)
+    geomatics.timeseries.bounding_box(files, var, min_coords, max_coords, dims, engine=engine, xr_kwargs=xr_kwargs,
+                                      strp_filename=strp_filename)
     t3 = datetime.datetime.now()
-    geomatics.timeseries.polygons(files, var, poly, dims, engine=engine, xr_kwargs=xr_kwargs)
+    geomatics.timeseries.polygons(files, var, poly, dims, engine=engine, xr_kwargs=xr_kwargs,
+                                  strp_filename=strp_filename)
     t4 = datetime.datetime.now()
-    geomatics.timeseries.full_array_stats(files, var, engine=engine, xr_kwargs=xr_kwargs, strp=strp)
+    geomatics.timeseries.full_array_stats(files, var, engine=engine, xr_kwargs=xr_kwargs, strp_filename=strp_filename)
     t5 = datetime.datetime.now()
     return (t2 - t1).total_seconds(), (t3 - t2).total_seconds(), (t4 - t3).total_seconds(), (t5 - t4).total_seconds()
 
