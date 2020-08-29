@@ -4,7 +4,8 @@ import numpy as np
 import pygrib
 import xarray as xr
 
-__all__ = ['_open_by_engine', '_array_by_engine', '_pick_engine', '_check_var_in_dataset', '_array_to_stat_list']
+__all__ = ['_open_by_engine', '_array_by_engine', '_attribute_by_engine', '_pick_engine', '_check_var_in_dataset',
+           '_array_to_stat_list']
 
 NETCDF_EXTENSIONS = ('.nc', '.nc4')
 GRIB_EXTENSIONS = ('.grb', '.grib', '.grib2')
@@ -49,6 +50,21 @@ def _array_by_engine(open_file, var: str or int, h5_group: str = None):
         if h5_group is not None:
             open_file = open_file[h5_group]
         return open_file[var][:]  # might need to use [...] for string data
+    else:
+        raise ValueError(f'Unrecognized opened file dataset: {type(open_file)}')
+
+
+def _attribute_by_engine(open_file, var: str, attribute: str, h5_group: str = None):
+    if isinstance(open_file, xr.Dataset) or isinstance(open_file, xr.DataArray):  # xarray, cfgrib, rasterio
+        return open_file[var].attrs[attribute]
+    elif isinstance(open_file, nc.Dataset):  # netcdf4
+        return open_file[var].getncattr(attribute)
+    elif isinstance(open_file, list):  # pygrib
+        return open_file[var][attribute]
+    elif isinstance(open_file, h5py.File) or isinstance(open_file, h5py.Dataset):  # h5py
+        if h5_group is not None:
+            open_file = open_file[h5_group]
+        return open_file[var].attrs[attribute].decode('UTF-8')
     else:
         raise ValueError(f'Unrecognized opened file dataset: {type(open_file)}')
 

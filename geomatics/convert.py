@@ -243,9 +243,9 @@ def upsample_gtiff(files: list, scale: float) -> list:
 def tif_to_nc(tif: str, var: str, time: datetime.datetime, dtype: str = 'i2', fill: int or str = 0,
               compress: bool = False, level: int = 9) -> None:
     """
-    Converts a single tif to a netcdf compliant with the Common Data Model (CDM) and therefore able to be used by the
-    THREDDS data server. Your tif MUST be projected to a global coordinate system using latitude and longtiude for best
-    results with THREDDS so you MUST reproject your tif before using this function.
+    Converts a single tif to a netcdf compliant with the Climate and Forecast (CF) Standards and therefore able to be
+    used by the THREDDS data server. Your tif MUST be projected to a global coordinate system using latitude and
+    longtiude for best results with THREDDS so you MUST reproject your tif before using this function.
 
     Args:
         tif (str): path to the tif to convert
