@@ -2,6 +2,7 @@ import datetime
 import os
 import tempfile
 
+import affine
 import geopandas
 import numpy as np
 import pandas as pd
@@ -11,17 +12,19 @@ from dateutil.relativedelta import relativedelta
 
 from ._utils import _open_by_engine, _array_by_engine, _attribute_by_engine, _pick_engine, \
     _check_var_in_dataset, _array_to_stat_list
-from .data import gen_affine
 
-__all__ = ['time_series']
-ALL_STATS = ('mean', 'median', 'max', 'min', 'sum', 'std')
-ALL_ENGINES = ('xarray', 'netcdf4', 'cfgrib', 'pygrib', 'h5py', 'rasterio')
-RECOGNIZED_TIME_INTERVALS = ('years', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds')
+__all__ = ['time_series', ]
+ALL_STATS = ('mean', 'median', 'max', 'min', 'sum', 'std',)
+ALL_ENGINES = ('xarray', 'netcdf4', 'cfgrib', 'pygrib', 'h5py', 'rasterio',)
+RECOGNIZED_TIME_INTERVALS = ('years', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds',)
+X_VARIABLES = ('x', 'longitude', 'lon', 'degrees_east', 'eastings',)
+Y_VARIABLES = ('y', 'latitude', 'lat', 'degrees_north', 'northings',)
+Z_VARIABLES = ('z', 'depth', 'elevation', 'altitude',)
 
 
 def time_series(
-        files: list or tuple, var: str or int, dim_order: tuple, t_var: str = 'time', crs: str = '+proj=latlong',
-        point: tuple = None, bound: tuple = None, array: bool = False, polys: str = None, stats: list or str = 'mean',
+        files: list or tuple, var: str or int, dim_order: tuple, t_var: str = 'time', stats: list or str = 'mean',
+        point: tuple = None, bound: tuple = None, polys: str = None, masks: np.array = None, array: bool = False,
         **kwargs
 ) -> pd.DataFrame:
     """
@@ -43,28 +46,26 @@ def time_series(
             urls to an OPENDAP service (but beware the data transfer speed bottleneck)
         var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
             Temperature) or the band number if you are using grib files and you specify the engine as pygrib
-        dim_order (tuple): A tuple of the names of the (x, y, z) variables in the data files which you specified coords for.
-            X dimension names are usually 'lon', 'longitude', 'x', or similar
-            Y dimension names are usually 'lat', 'latitude', 'y', or similar
-            Z dimension names are usually 'depth', 'elevation', 'z', or similar
+        dim_order (tuple): A tuple of the names of the dimensions for `var`, listed in order.
         t_var (str): Name of the time variable if it is used in the files. Default: 'time'
-        crs (str): an EPSG string, e.g. "EPSG:4326", for the raster data used for time series with the polys argument
-
         point (tuple): a tuple of coordinate values, listed in the same order as dim_order, for the data of interest.
         bound (tuple): a tuple containing 2 tuples, each in the format described for the point argument, one tuple
             should list the lower bound values and the other should list the upper bound (order of upper/lower bound
-            tuples does not matter although the coordinate order in each must match the order in dim_order
+            tuples does not matter although the coordinate order in each must match the order in dim_order)
+        polys (str): path to any spatial geometry file, such as a shapefile or geojson, which can be read by geopandas
+        masks (np.array): a numpy array containing np.nan or 1 values of the same shape as the source data files (not
+            including the shape of the time dimension, if applicable). Useful when you want to mask irregular subsets.
         array (bool): when true, the specified stats are calculated on the entire array for each time step available
-        polys (str): path to a spatial geometry file, such as a shapefile or geojson, which can be read by geopandas
         stats (list or str): How to reduce arrays of values to a single scalar value for the timeseries.
             Options include: mean, median, max, min, sum, std, a percentile (e.g. 25%) or all.
             Provide a list of strings (e.g. ['mean', 'max']), or a comma separated string (e.g. 'mean,max,min')
 
     Keyword Args:
         engine (str): the python package used to power the file reading. Defaults to best for the type of input data
-        fill_value (int): The value used for filling no_data spaces in the source file's array. Default: -9999
         h5_group (str): if all variables in the hdf5 file are in the same group, specify the name of the group here
         xr_kwargs (dict): A dictionary of kwargs that you might need when opening complex grib files with xarray
+        crs (str): an EPSG string, e.g. "EPSG:4326", for the raster data used for time series with the polys argument
+        fill_value (int): The value used for filling no_data spaces in the source file's array. Default: -9999
         interp_units (bool): If your data conforms to the CF NetCDF standard for time data, choose True to
             convert the values in the time variable to datetime strings in the pandas output. The units string for the
             time variable of each file is checked separately unless you specify it in the unit_str parameter.
@@ -86,7 +87,9 @@ def time_series(
     engine = kwargs.get('engine', _pick_engine(files[0]))
     h5_group = kwargs.get('h5_group', None)
     xr_kwargs = kwargs.get('xr_kwargs', None)
+
     fill_value = kwargs.get('fill_value', -9999)
+
     interp_units = kwargs.get('interp_units', False)
     unit_str = kwargs.get('unit_str', None)
     origin_format = kwargs.get('origin_format', None)
@@ -103,11 +106,22 @@ def time_series(
                       t_var, interp_units, unit_str, origin_format, strp_filename,
                       h5_group, xr_kwargs)
     elif polys is not None:
-        return _polys(files, engine, var, polys, fill_value, stats, crs,
+        crs = kwargs.get('crs', '+proj=latlong')
+        # todo x and y variables customizable
+        # verify that the provided dimensions have an x and y variable
+        if not any(str(x).lower() in X_VARIABLES for x in dim_order):
+            raise ValueError('No spatial "x" coordinate variable found in the dim_order for this variable/data')
+        if not any(str(y).lower() in Y_VARIABLES for y in dim_order):
+            raise ValueError('No spatial "y" coordinate variable found in the dim_order for this variable/data')
+        mask = _create_spatial_mask_array(files[0], polys, var, dim_order, crs, engine, h5_group, xr_kwargs)
+        return _masks(files, engine, var, mask, fill_value, stats, dim_order,
+                      t_var, interp_units, unit_str, origin_format, strp_filename,
+                      h5_group, xr_kwargs)
+    elif masks is not None:
+        return _masks(files, engine, var, masks, fill_value, stats, dim_order,
                       t_var, interp_units, unit_str, origin_format, strp_filename,
                       h5_group, xr_kwargs)
     elif array:
-        slices = _coords_to_slices(_open_by_engine(files[0]), dim_order, bound[0], bound[1], h5_group=h5_group)
         return _array()
     else:
         raise ValueError('Must provide the point, bound, polygon, or array parameter.')
@@ -174,34 +188,10 @@ def _bound(files: list or tuple, engine: str, var: str or int, slices: tuple, fi
     return pd.DataFrame(results)
 
 
-def _polys(files: list or tuple, engine: str, var: str or int, poly: str or dict, fill_value: int, stats: list,
-           crs: str, t_var: str, interp_units: bool, unit_str: str, origin_format: str, strp_filename: str,
+def _masks(files: list or tuple, engine: str, var: str or int, mask: np.array, fill_value: int, stats: list,
+           dim_order: tuple,
+           t_var: str, interp_units: bool, unit_str: str, origin_format: str, strp_filename: str,
            h5_group: str = None, xr_kwargs: dict = None, ) -> pd.DataFrame:
-    # generate an affine transform used in zonal statistics
-    affine = gen_affine(files[0], dims[0], dims[1], engine=engine, xr_kwargs=xr_kwargs, h5_group=h5_group)
-
-    file = _open_by_engine(files[0], engine, xr_kwargs)
-    arr = np.squeeze(np.ones(_array_by_engine(file, var, h5_group).shape))
-    tmp_geotiff = os.path.join(tempfile.gettempdir(), '_.tiff')
-    with rasterio.open(
-            tmp_geotiff,
-            'w',
-            driver='GTiff',
-            height=arr.shape[0],
-            width=arr.shape[1],
-            count=1,
-            dtype=arr.dtype,
-            nodata=np.nan,
-            crs=crs,
-            transform=affine,
-    ) as dst:
-        dst.write(arr, 1)
-    shp_file = geopandas.read_file(poly)
-
-    mask, _ = rasterio.mask.mask(rasterio.open(tmp_geotiff, 'r'), shp_file.geometry)
-    os.remove(tmp_geotiff)
-    # np.nan_to_num(mask, copy=False)
-
     # make the return item
     results = dict(datetime=[])
     # add a list for each stat requested
@@ -216,22 +206,26 @@ def _polys(files: list or tuple, engine: str, var: str or int, poly: str or dict
             opened_file, file, t_var, interp_units, unit_str, origin_format, strp_filename, h5_group))
 
         # slice the variable's array, returns array with shape corresponding to dimension order and size
-        vs = _array_by_engine(opened_file, var, h5_group)
-        vs[vs == fill_value] = np.nan
-        # modify the array as necessary
-        if vs.ndim == 2:
-            # if the values are in a 2D array, cushion it with a 3rd dimension so you can iterate
-            vs = np.reshape(vs, [1] + list(np.shape(vs)))
-            dim_order = 't' + dim_order
-        if t_var in dim_order:
-            # roll axis brings the time dimension to the front so we can iterate over it -- may not work as expected
-            vs = np.rollaxis(vs, dim_order.index(t_var))
+        vals = _array_by_engine(opened_file, var, h5_group)
+        vals[vals == fill_value] = np.nan
 
-        # do zonal statistics on everything
-        for slice_2d in vs:
-            slice_2d = np.where(np.isnan(mask), np.nan, slice_2d * mask).squeeze()
+        # if the dimensions are the same
+        if vals.ndim == mask.ndim:
+            vals = np.where(np.isnan(mask), np.nan, vals * mask).squeeze()
             for stat in stats:
-                results[stat] += _array_to_stat_list(slice_2d, stat)
+                results[stat] += _array_to_stat_list(vals, stat)
+        elif vals.ndim == mask.ndim + 1:
+            if t_var in dim_order:
+                # roll axis brings the time dimension to the "front" so we iterate over it in a for loop
+                for time_step_array in np.rollaxis(vals, dim_order.index(t_var)):
+                    time_step_array = np.where(np.isnan(mask), np.nan, time_step_array * mask).squeeze()
+                    for stat in stats:
+                        results[stat] += _array_to_stat_list(time_step_array, stat)
+            else:
+                raise RuntimeError(f'Wrong dimensions. mask dims: {mask.ndim}, data\'s dims {vals.ndim}, file: {file}')
+        else:
+            raise RuntimeError(f'Wrong dimensions. mask dims: {mask.ndim}, data\'s dims {vals.ndim}, file: {file}')
+
         if engine != 'pygrib':
             opened_file.close()
 
@@ -239,6 +233,7 @@ def _polys(files: list or tuple, engine: str, var: str or int, poly: str or dict
     return pd.DataFrame(results)
 
 
+# todo fix the array stats function
 def _array(files: list or tuple, var: str or int, t_var: str = 'time', fill_value: int = -9999,
            stats: list or str = 'mean',
            interp_units: bool = False, unit_str: str = None, origin_format: str = None,
@@ -311,6 +306,54 @@ def _array(files: list or tuple, var: str or int, t_var: str = 'time', fill_valu
 
     # return the data stored in a dataframe
     return pd.DataFrame(results)
+
+
+def _create_spatial_mask_array(sample_file: str, poly: str, var: str, dim_order: tuple, crs: str,
+                               engine, h5_group, xr_kwargs):
+    x = None
+    y = None
+    for a in dim_order:
+        if a in X_VARIABLES:
+            x = a
+        if a in Y_VARIABLES:
+            y = a
+
+    sample_data = _open_by_engine(sample_file, engine, xr_kwargs)
+    x = _array_by_engine(sample_data, x, h5_group)
+    y = _array_by_engine(sample_data, y, h5_group)
+    var = _array_by_engine(sample_data, var, h5_group)
+    if engine != 'pygrib':
+        sample_data.close()
+
+    # catch the case when people used 2d instead of the proper 1d coordinate dimensions
+    if y.ndim == 2:
+        y = y[:, 0]
+    if x.ndim == 2:
+        x = x[0, :]
+
+    # write a temporary geotiff with a single value of 1 which we use to create the mask with rasterio
+    tmp_geotiff = os.path.join(tempfile.gettempdir(), '_python_geomatics_temp.tiff')
+    with rasterio.open(
+            tmp_geotiff,
+            'w',
+            driver='GTiff',
+            height=y.shape[0],
+            width=x.shape[1],
+            count=1,
+            dtype=var.dtype,
+            nodata=np.nan,
+            crs=crs,
+            transform=affine.Affine(x[1] - x[0], 0, x.min(), 0, y[0] - y[1], y.max()),
+    ) as dst:
+        dst.write(np.squeeze(np.ones(var.shape)), 1)
+
+    # read the source spatial file and reproject to the correct crs
+    shp_file = geopandas.read_file(poly).to_crs(crs=crs)
+    # creates a mask of the shapefile (also returns the affine.Affine transform which we ignore)
+    mask, _ = rasterio.mask.mask(rasterio.open(tmp_geotiff, 'r'), shp_file.geometry)
+    # delete the temporary geotiff
+    os.remove(tmp_geotiff)
+    return mask
 
 
 def _gen_stat_list(stats: str or list):

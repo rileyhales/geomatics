@@ -13,7 +13,7 @@ HDF_EXTENSIONS = ('.h5', '.hd5', '.hdf5')
 GEOTIFF_EXTENSIONS = ('.gtiff', '.tiff', 'tif')
 
 
-def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None) -> np.array:
+def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None):
     if engine is None:
         engine = _pick_engine(path)
     if backend_kwargs is None:
@@ -35,7 +35,7 @@ def _open_by_engine(path: str, engine: str = None, backend_kwargs: dict = None) 
         raise ValueError(f'Unable to open file, unsupported engine: {engine}')
 
 
-def _array_by_engine(open_file, var: str or int, h5_group: str = None):
+def _array_by_engine(open_file, var: str or int, h5_group: str = None) -> np.array:
     if isinstance(open_file, xr.Dataset):  # xarray, cfgrib
         return open_file[var].data
     elif isinstance(open_file, xr.DataArray):  # rasterio
