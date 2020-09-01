@@ -122,7 +122,9 @@ def time_series(
                       t_var, interp_units, unit_str, origin_format, strp_filename,
                       h5_group, xr_kwargs)
     elif array:
-        return _array()
+        return _array(files, engine, var, fill_value, stats, dim_order,
+                      t_var, interp_units, unit_str, origin_format, strp_filename,
+                      h5_group, xr_kwargs)
     else:
         raise ValueError('Must provide the point, bound, polygon, or array parameter.')
 
@@ -233,50 +235,9 @@ def _masks(files: list or tuple, engine: str, var: str or int, mask: np.array, f
     return pd.DataFrame(results)
 
 
-# todo fix the array stats function
-def _array(files: list or tuple, var: str or int, t_var: str = 'time', fill_value: int = -9999,
-           stats: list or str = 'mean',
-           interp_units: bool = False, unit_str: str = None, origin_format: str = None,
-           strp_filename: str = None, engine: str = None, h5_group: str = None,
-           xr_kwargs: dict = None, ) -> pd.DataFrame:
-    """
-    Creates a timeseries of values based on values within a bounding box specified by your coordinates.
-
-    The datetime for each value extracted can be assigned 4 ways and is assigned in this order of preference:
-        1. When interp_units is True, interpret the values in the time variable as datetimes using their units
-        2. When a pattern is specified with strp_filename, the datetime extracted from the filename is applied to all
-           values coming from that dataset
-        3. The numerical values from the time variable are used without further interpretation
-        4. The string file name is used if there is no time variable and no other options were provided
-
-    Args:
-        files (list): A list (even if len==1) of either absolute file paths to netcdf, grib, hdf5, or geotiff files or
-            urls to an OPENDAP service (but beware the data transfer speed bottleneck)
-        var (str or int): The name of a variable as it is stored in the file (e.g. often 'temp' or 'T' instead of
-            Temperature) or the band number if you are using grib files and you specify the engine as pygrib
-        t_var (str): Name of the time variable if it is used in the files. Default: 'time'
-        stats (list or str): How to reduce the values within the bounding box into a single value for the timeseries.
-            Options include: mean, median, max, min, sum, std, a percentile (e.g. 25%) or all.
-            Provide a list of strings (e.g. ['mean', 'max']), or a comma separated string (e.g. 'mean,max,min')
-        fill_value (int): The value used for filling no_data spaces in the source file's array. Default: -9999
-        interp_units (bool): If your data conforms to the CF NetCDF standard for time data, choose True to
-            convert the values in the time variable to datetime strings in the pandas output. The units string for the
-            time variable of each file is checked separately unless you specify it in the unit_str parameter.
-        unit_str (str): a CF Standard conformant string indicating how the spacing and origin of the time values.
-            Only specify this if ALL files that you query will contain the same units string. This is helpful if your
-            files do not contain a units string. Usually this looks like "step_size since YYYY-MM-DD HH:MM:SS" such as
-            "days since 2000-01-01 00:00:00".
-        origin_format (str): A datetime.strptime string for extracting the origin time from the units string. Defaults
-            to '%Y-%m-%d %X'.
-        strp_filename (str): A string compatible with datetime.strptime for extracting datetimes from patterns in file
-            names.
-        engine (str): the python package used to power the file reading. Defaults to best for the type of input data
-        h5_group (str): if all variables in the hdf5 file are in the same group, specify the name of the group here
-        xr_kwargs (dict): A dictionary of kwargs that you might need when opening complex grib files with xarray
-
-    Returns:
-        pandas.DataFrame with an index, datetime column, and a column of values for each stat specified
-    """
+def _array(files: list or tuple, engine: str, var: str or int, fill_value: int, stats: list, dim_order: tuple,
+           t_var: str, interp_units: bool, unit_str: str, origin_format: str, strp_filename: str,
+           h5_group: str = None, xr_kwargs: dict = None, ) -> pd.DataFrame:
     if engine is None:
         engine = _pick_engine(files[0])
 
@@ -297,10 +258,15 @@ def _array(files: list or tuple, var: str or int, t_var: str = 'time', fill_valu
             opened_file, file, t_var, interp_units, unit_str, origin_format, strp_filename, h5_group))
 
         # slice the variable's array, returns array with shape corresponding to dimension order and size
-        vs = _array_by_engine(opened_file, var, h5_group=h5_group)
-        vs[vs == fill_value] = np.nan
+        vals = _array_by_engine(opened_file, var, h5_group=h5_group)
+        vals[vals == fill_value] = np.nan
         for stat in stats:
-            results[stat] += _array_to_stat_list(vs, stat)
+            if t_var in dim_order:
+                # roll axis brings the time dimension to the "front" so we iterate over it in a for loop
+                for time_step_array in np.rollaxis(vals, dim_order.index(t_var)):
+                    results[stat] += _array_to_stat_list(time_step_array, stat)
+            else:
+                results[stat] += _array_to_stat_list(vals, stat)
         if engine != 'pygrib':
             opened_file.close()
 
