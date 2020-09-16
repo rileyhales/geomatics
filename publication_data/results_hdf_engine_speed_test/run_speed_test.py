@@ -37,7 +37,7 @@ if __name__ == '__main__':
         data[f'{engine}_bbox'] = box_times
         data[f'{engine}_poly'] = ply_times
         data[f'{engine}_full'] = fll_times
-    df = pd.DataFrame(data).to_csv('netcdf_test_results.csv', index=False)
+    df = pd.DataFrame(data).to_csv('hdf_test_results.csv', index=False)
 
     tests.speed.make_bar_chart(df)
     stats_df = tests.speed.compute_stats(df)

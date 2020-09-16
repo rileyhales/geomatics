@@ -29,7 +29,7 @@ if __name__ == '__main__':
         fll_times = []
         for i in range(50):
             pt, bx, ply, fll = tests.speed.test_engine(
-                files, band_num, coords, min_coords, max_coords, ('longitude', 'latitude'), engine, filepath, strp=strp)
+                files, band_num, coords, min_coords, max_coords, ('longitude', 'latitude'), engine, filepath, strp_filename=strp)
             pt_times.append(pt)
             box_times.append(bx)
             ply_times.append(ply)
