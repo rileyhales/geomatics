@@ -1,3 +1,8 @@
+"""
+Author: Riley Hales
+Copyright: Riley Hales, RCH Engineering, 2020
+License: BSD Clear 3 Clause License
+"""
 import datetime
 import os
 import tempfile
@@ -17,9 +22,8 @@ __all__ = ['time_series', ]
 ALL_STATS = ('mean', 'median', 'max', 'min', 'sum', 'std',)
 ALL_ENGINES = ('xarray', 'netcdf4', 'cfgrib', 'pygrib', 'h5py', 'rasterio',)
 RECOGNIZED_TIME_INTERVALS = ('years', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds',)
-X_VARIABLES = ('x', 'longitude', 'lon', 'degrees_east', 'eastings',)
-Y_VARIABLES = ('y', 'latitude', 'lat', 'degrees_north', 'northings',)
-Z_VARIABLES = ('z', 'depth', 'elevation', 'altitude',)
+SPATIAL_X_VARS = ('x', 'lon', 'longitude', 'longitudes', 'degrees_east', 'eastings',)
+SPATIAL_Y_VARS = ('y', 'lat', 'latitude', 'longitudes', 'degrees_north', 'northings',)
 
 
 def time_series(
@@ -28,18 +32,25 @@ def time_series(
         **kwargs
 ) -> pd.DataFrame:
     """
-    Creates a time series of values from arrays contained in netCDF, grib, hdf, or geotiff formats. Values in the series
-    are extracted from a point, bounding box, or shapefile/geojson subset of the array, or are summary statistics of the
-    entire array.
+    Creates a time series of values from arrays contained in netCDF, grib, hdf, or geotiff formats. Values in the
+    series are extracted in one of the following ways:
 
-    The datetime for each value extracted can be assigned 4 ways and is assigned in this order of preference:
-        1. When interp_units is True, interpret the values in the time variable as datetimes using the units attribute.
-            You can specify the units string with the units_str kwarg and the origin_format kwarg if the date doesn't
-            follow the conventional YYYY-MM-DD HH:MM:SS format.
-        2. When a pattern is specified with strp_filename, the datetime extracted from the filename is applied to all
-           values coming from that dataset
-        3. The numerical values from the time variable are used without further interpretation
-        4. The string file name is used if there is no time variable and no other options were provided
+    #. Specifying coordinates of a **point** (1 value of interest for each dimension the variable requires).
+    #. A **bounding box**: 2 point coordinates which list the minimum and maximum values.
+    #. With a mask created from **spatial data**, such as a shapefile or geojson.
+    #. A custom **masked array** not derived from spatial data, such as an array that masks multiple bounds.
+    #. Summary **statistics** of the entire array contained in the file.
+
+    Datetimes values are extracted in one of 4 ways (controlled by the :code:`interp_units`, :code:`units_str`,
+    :code:`origin_format`, and :code:`strp_format` parameters), in this order of preference:
+
+    #. When :code:`interp_units` is True, interpret the time variable values as datetimes using time's units attribute.
+       Override the file using the :code:`units_str` kwarg and the :code:`origin_format` kwarg if the date doesn't use
+       YYYY-MM-DD HH:MM:SS format.
+    #. When a pattern is specified with :code:`strp_filename`, a datetime extracted from the filename is applied to all
+       values coming from that dataset.
+    #. If a time variable exists, its numerical values are used without further interpretation.
+    #. The string file name is used if there is no time variable and no other options were provided.
 
     Args:
         files (list): A list (even if len==1) of either absolute file paths to netcdf, grib, hdf5, or geotiff files or
@@ -49,10 +60,13 @@ def time_series(
         dim_order (tuple): A tuple of the names of the dimensions for `var`, listed in order.
         t_var (str): Name of the time variable if it is used in the files. Default: 'time'
         point (tuple): a tuple of coordinate values, listed in the same order as dim_order, for the data of interest.
+            To get all time data from the files, use True or None in place of a coordinate for the time variable.
         bound (tuple): a tuple containing 2 tuples, each in the format described for the point argument, one tuple
             should list the lower bound values and the other should list the upper bound (order of upper/lower bound
             tuples does not matter although the coordinate order in each must match the order in dim_order)
-        polys (str): path to any spatial geometry file, such as a shapefile or geojson, which can be read by geopandas
+        polys (str): path to any spatial geometry file, such as a shapefile or geojson, which can be read by geopandas.
+            You also need to specify the source raster's CRS string with the crs parameter. Applicable only to source
+            data with 2 spatial dimensions and, optionally, a time dimension.
         masks (np.array): a numpy array containing np.nan or 1 values of the same shape as the source data files (not
             including the shape of the time dimension, if applicable). Useful when you want to mask irregular subsets.
         array (bool): when true, the specified stats are calculated on the entire array for each time step available
@@ -64,12 +78,12 @@ def time_series(
         engine (str): the python package used to power the file reading. Defaults to best for the type of input data
         h5_group (str): if all variables in the hdf5 file are in the same group, specify the name of the group here
         xr_kwargs (dict): A dictionary of kwargs that you might need when opening complex grib files with xarray
-        crs (str): an EPSG string, e.g. "EPSG:4326", for the raster data used for time series with the polys argument
         fill_value (int): The value used for filling no_data spaces in the source file's array. Default: -9999
+        crs (str): an EPSG string, e.g. "EPSG:4326", for the raster data used for time series with the polys argument
         interp_units (bool): If your data conforms to the CF NetCDF standard for time data, choose True to
             convert the values in the time variable to datetime strings in the pandas output. The units string for the
             time variable of each file is checked separately unless you specify it in the unit_str parameter.
-        unit_str (str): a CF Standard conformant string indicating how the spacing and origin of the time values.
+        unit_str (str): a CF Standard conforming string indicating how the spacing and origin of the time values.
             Only specify this if ALL files that you query will contain the same units string. This is helpful if your
             files do not contain a units string. Usually this looks like "step_size since YYYY-MM-DD HH:MM:SS" such as
             "days since 2000-01-01 00:00:00".
@@ -109,9 +123,9 @@ def time_series(
         crs = kwargs.get('crs', '+proj=latlong')
         # todo x and y variables customizable
         # verify that the provided dimensions have an x and y variable
-        if not any(str(x).lower() in X_VARIABLES for x in dim_order):
+        if not any(str(x).lower() in SPATIAL_X_VARS for x in dim_order):
             raise ValueError('No spatial "x" coordinate variable found in the dim_order for this variable/data')
-        if not any(str(y).lower() in Y_VARIABLES for y in dim_order):
+        if not any(str(y).lower() in SPATIAL_Y_VARS for y in dim_order):
             raise ValueError('No spatial "y" coordinate variable found in the dim_order for this variable/data')
         mask = _create_spatial_mask_array(files[0], polys, var, dim_order, crs, engine, h5_group, xr_kwargs)
         return _masks(files, engine, var, mask, fill_value, stats, dim_order,
@@ -126,7 +140,7 @@ def time_series(
                       t_var, interp_units, unit_str, origin_format, strp_filename,
                       h5_group, xr_kwargs)
     else:
-        raise ValueError('Must provide the point, bound, polygon, or array parameter.')
+        raise ValueError('Must provide either the point, bound, polys, masks, or array parameters.')
 
 
 def _point(files: list or tuple, engine: str, var: str or int, slices: tuple, fill_value: int,
@@ -279,9 +293,9 @@ def _create_spatial_mask_array(sample_file: str, poly: str, var: str, dim_order:
     x = None
     y = None
     for a in dim_order:
-        if a in X_VARIABLES:
+        if a in SPATIAL_X_VARS:
             x = a
-        if a in Y_VARIABLES:
+        if a in SPATIAL_Y_VARS:
             y = a
 
     sample_data = _open_by_engine(sample_file, engine, xr_kwargs)
@@ -405,9 +419,15 @@ def _coords_to_slices(sample_file, dim_order: tuple, coords_min: tuple, coords_m
 
     for order, coord_var in enumerate(dim_order):
         vals = _array_by_engine(sample_file, coord_var, h5_group)
-        if vals.ndim != 1:
-            # todo try to reduce the array to 1 dimensional
-            raise RuntimeError(f"The coordinate variable {coord_var} is 2 dimensional and couldn't be reduced to 1")
+        if vals.ndim == 2:
+            if vals[0, 0] == vals[0, 1]:
+                vals = vals[0, :]
+            elif vals[0, 0] == vals[1, 0]:
+                vals = vals[:, 0]
+            else:
+                raise RuntimeError("A 2D coordinate variable had non-uniform values and couldn't be reduced")
+        elif vals.ndim > 2:
+            raise RuntimeError(f"Invalid data. Coordinate variables should be 1 dimensional")
 
         min_val = vals.min()
         max_val = vals.max()

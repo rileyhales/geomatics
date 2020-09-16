@@ -44,4 +44,4 @@ Timeseries Functions
 ~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: geomatics.timeseries
-	:members: point, bounding_box, polygons, full_array_stats,
+	:members: time_series
